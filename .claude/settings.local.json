@@ -6,7 +6,11 @@
       "Bash(python -m py_compile app/services/family_service.py)",
       "Bash(python -m py_compile app/services/checkin_service.py)",
       "Bash(python -m py_compile app/routers/family.py)",
-      "Bash(python -m py_compile app/routers/checkins.py)"
+      "Bash(python -m py_compile app/routers/checkins.py)",
+      "Bash(wc -l /c/Users/amrit/hackathons/witchhunt/backend/app/services/*.py)",
+      "Bash(wc -l /c/Users/amrit/hackathons/witchhunt/backend/app/routers/*.py /c/Users/amrit/hackathons/witchhunt/backend/app/routers/ai/*.py)",
+      "Bash(cd /c/Users/amrit/hackathons/witchhunt/backend echo \"=== FILE COUNT ===\" find app/ -name \"*.py\" ! -name \"__init__.py\")",
+      "Bash(xargs wc:*)"
     ]
   }
 }
