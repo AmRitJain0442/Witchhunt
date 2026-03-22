@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(python3:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(python -m py_compile app/services/family_service.py)",
+      "Bash(python -m py_compile app/services/checkin_service.py)",
+      "Bash(python -m py_compile app/routers/family.py)",
+      "Bash(python -m py_compile app/routers/checkins.py)"
     ]
   }
 }
