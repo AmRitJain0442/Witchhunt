@@ -1,8 +1,96 @@
 @import "tailwindcss";
 
+/* ── Class-based dark mode (used by next-themes) ─────────────────────────── */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Design tokens ───────────────────────────────────────────────────────── */
 :root {
-  --green: #2D6A4F;
-  --green-light: #52B788;
-  --green-dark: #1B4332;
-  --orange: #F4845F;
+  --bg:            #F9F9F7;
+  --bg-subtle:     #F2F2EF;
+  --surface:       #FFFFFF;
+  --surface-raised:#F6F6F3;
+
+  --border:        rgba(0,0,0,0.07);
+  --border-strong: rgba(0,0,0,0.13);
+
+  --tx-1:          #17171A;
+  --tx-2:          #5A5A62;
+  --tx-3:          #9898A0;
+
+  --accent:        #1D6042;
+  --accent-hover:  #155234;
+  --accent-muted:  rgba(29,96,66,0.09);
+  --accent-text:   #FFFFFF;
+
+  --red:           #9E2020;
+  --amber:         #8C5500;
+  --green:         #1D6042;
+
+  --shadow-sm:     0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md:     0 4px 12px rgba(0,0,0,0.07);
+  --shadow-lg:     0 12px 32px rgba(0,0,0,0.09);
 }
+
+.dark {
+  --bg:            #0D0D0B;
+  --bg-subtle:     #141412;
+  --surface:       #191917;
+  --surface-raised:#202020;
+
+  --border:        rgba(255,255,255,0.07);
+  --border-strong: rgba(255,255,255,0.13);
+
+  --tx-1:          #EFEFE9;
+  --tx-2:          #888882;
+  --tx-3:          #484844;
+
+  --accent:        #4DC48A;
+  --accent-hover:  #3DB07A;
+  --accent-muted:  rgba(77,196,138,0.10);
+  --accent-text:   #0D0D0B;
+
+  --red:           #F87171;
+  --amber:         #FBB045;
+  --green:         #4DC48A;
+
+  --shadow-sm:     0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md:     0 4px 16px rgba(0,0,0,0.4);
+  --shadow-lg:     0 12px 40px rgba(0,0,0,0.5);
+}
+
+/* ── Map to Tailwind utility classes ─────────────────────────────────────── */
+@theme inline {
+  --color-bg:             var(--bg);
+  --color-bg-subtle:      var(--bg-subtle);
+  --color-surface:        var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border:         var(--border);
+  --color-border-strong:  var(--border-strong);
+  --color-tx-1:           var(--tx-1);
+  --color-tx-2:           var(--tx-2);
+  --color-tx-3:           var(--tx-3);
+  --color-accent:         var(--accent);
+  --color-accent-hover:   var(--accent-hover);
+  --color-accent-muted:   var(--accent-muted);
+  --color-accent-text:    var(--accent-text);
+  --color-red:            var(--red);
+  --color-amber:          var(--amber);
+  --color-green:          var(--green);
+}
+
+/* ── Base ────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  background-color: var(--bg);
+  color: var(--tx-1);
+}
+
+::selection {
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 99px; }

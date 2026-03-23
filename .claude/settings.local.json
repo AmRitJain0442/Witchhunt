@@ -20,7 +20,10 @@
       "Bash(for dir:*)",
       "Bash(do)",
       "Bash(cp \"C:/Users/amrit/hackathons/witchhunt/web/src/app/dashboard/layout.tsx\" \"C:/Users/amrit/hackathons/witchhunt/web/src/app/$dir/layout.tsx\")",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(ls:*)",
+      "Bash(node -e \"console.log\\(require\\(''./node_modules/tailwindcss/package.json''\\).version\\)\")",
+      "Bash(xargs grep:*)"
     ]
   }
 }

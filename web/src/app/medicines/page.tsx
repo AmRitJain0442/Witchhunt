@@ -6,88 +6,85 @@ import { medicineApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 type Schedule = { medicine_id: string; medicine_name: string; dosage: string; dose_time: string; status: string };
-type Medicine = { id: string; name: string; category: string; dosage: string; frequency: string; is_emergency: boolean; current_stock?: number; days_supply_remaining?: number; refill_alert: boolean; end_date?: string };
+type Medicine  = { id: string; name: string; category: string; dosage: string; frequency: string; is_emergency: boolean; current_stock?: number; days_supply_remaining?: number; refill_alert: boolean };
 
-const STATUS_STYLE: Record<string, string> = {
-  taken:   'text-emerald-600 bg-emerald-50',
-  skipped: 'text-slate-400 bg-slate-50',
-  overdue: 'text-red-600 bg-red-50',
-  pending: 'text-amber-600 bg-amber-50',
+const DOT: Record<string, string> = {
+  taken:   'bg-green',
+  skipped: 'bg-tx-3',
+  overdue: 'bg-red',
+  pending: 'bg-border-strong',
 };
-const STATUS_ICON: Record<string, string> = { taken: '✅', skipped: '⏭️', overdue: '🔴', pending: '⏰' };
 
 export default function MedicinesPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<'today' | 'all'>('today');
 
-  const { data: today,    isLoading: loadingToday } = useQuery({ queryKey: ['medicines-today'], queryFn: medicineApi.today, retry: false });
-  const { data: allMeds,  isLoading: loadingAll }   = useQuery({ queryKey: ['medicines-all'],   queryFn: medicineApi.list,  retry: false });
+  const { data: today,   isLoading: l1 } = useQuery({ queryKey: ['medicines-today'], queryFn: medicineApi.today, retry: false });
+  const { data: allMeds, isLoading: l2 } = useQuery({ queryKey: ['medicines-all'],   queryFn: medicineApi.list,  retry: false });
 
-  const logMutation = useMutation({
+  const log = useMutation({
     mutationFn: ({ id, action, time }: { id: string; action: string; time: string }) =>
       medicineApi.logDose(id, action, time),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['medicines-today'] }),
   });
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Medicines</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Track doses and manage your cabinet</p>
-        </div>
+    <div className="p-8 max-w-4xl mx-auto">
+      <div className="mb-8">
+        <div className="text-[11px] uppercase tracking-widest text-tx-3 mb-1">Medicines</div>
+        <h1 className="text-3xl font-semibold tracking-tight text-tx-1">Medicine cabinet</h1>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 mb-6">
-        {(['today', 'all'] as const).map((t) => (
+      <div className="flex gap-0 border-b border-border mb-8">
+        {(['today', 'all'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={cn('pb-3 px-4 text-sm font-medium border-b-2 transition-colors -mb-px',
-              tab === t ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700'
-            )}
-          >{t === 'today' ? "Today's schedule" : 'All medicines'}</button>
+            className={cn('pb-3 mr-8 text-[13px] border-b-2 -mb-px transition-all',
+              tab === t ? 'border-accent text-tx-1 font-medium' : 'border-transparent text-tx-3 hover:text-tx-2'
+            )}>
+            {t === 'today' ? 'Today' : 'All medicines'}
+          </button>
         ))}
       </div>
 
       {tab === 'today' && (
         <>
           {today?.adherence_pct !== undefined && (
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${today.adherence_pct}%` }} />
+            <div className="flex items-center gap-4 mb-6">
+              <div className="flex-1 h-px bg-border overflow-hidden">
+                <div className="h-full bg-accent transition-all" style={{ width: `${today.adherence_pct}%` }} />
               </div>
-              <span className="text-sm text-slate-500 shrink-0">{Math.round(today.adherence_pct)}% adherence</span>
+              <span className="text-[12px] text-tx-3 font-mono shrink-0">{Math.round(today.adherence_pct)}% adherence</span>
             </div>
           )}
-          {loadingToday && <div className="text-center py-12 text-slate-400">Loading…</div>}
-          {!loadingToday && !today?.schedules?.length && (
-            <div className="text-center py-12">
-              <div className="text-4xl mb-2">🎉</div>
-              <div className="font-medium text-slate-700">No medicines today</div>
-              <div className="text-sm text-slate-400 mt-1">You're all caught up!</div>
+          {l1 && <div className="text-[13px] text-tx-3 py-8 text-center">Loading…</div>}
+          {!l1 && !today?.schedules?.length && (
+            <div className="py-16 text-center border border-dashed border-border rounded-xl">
+              <div className="text-[13px] text-tx-2 font-medium">All done for today</div>
+              <div className="text-[12px] text-tx-3 mt-1">No pending doses</div>
             </div>
           )}
-          <div className="space-y-2">
+          <div className="bg-surface border border-border rounded-xl overflow-hidden">
             {today?.schedules?.map((s: Schedule, i: number) => (
-              <div key={i} className={cn('bg-white rounded-xl border p-4 flex items-center gap-4', s.status === 'overdue' ? 'border-red-200' : 'border-slate-100')}>
-                <span className="text-xl">{STATUS_ICON[s.status] ?? '💊'}</span>
+              <div key={i} className={cn('flex items-center px-5 py-4 border-b border-border last:border-0 gap-4', s.status === 'overdue' && 'bg-red/[0.03]')}>
+                <div className={cn('w-1.5 h-1.5 rounded-full shrink-0', DOT[s.status] ?? 'bg-border-strong')} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-slate-800">{s.medicine_name}</div>
-                  <div className="text-xs text-slate-400 mt-0.5">{s.dosage} · {s.dose_time}</div>
+                  <div className="text-[13px] font-medium text-tx-1">{s.medicine_name}</div>
+                  <div className="text-[12px] text-tx-3 font-mono mt-0.5">{s.dosage} · {s.dose_time}</div>
                 </div>
-                <span className={cn('text-xs px-2 py-1 rounded-full font-medium capitalize', STATUS_STYLE[s.status] ?? '')}>{s.status}</span>
+                <span className={cn('text-[11px] uppercase tracking-wider shrink-0',
+                  s.status === 'taken' ? 'text-green' : s.status === 'overdue' ? 'text-red' : s.status === 'skipped' ? 'text-tx-3' : 'text-tx-3'
+                )}>{s.status}</span>
                 {(s.status === 'pending' || s.status === 'overdue') && (
                   <div className="flex gap-2 shrink-0">
-                    <button
-                      onClick={() => logMutation.mutate({ id: s.medicine_id, action: 'taken', time: s.dose_time })}
-                      disabled={logMutation.isPending}
-                      className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors"
-                    >Taken</button>
-                    <button
-                      onClick={() => logMutation.mutate({ id: s.medicine_id, action: 'skipped', time: s.dose_time })}
-                      disabled={logMutation.isPending}
-                      className="text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg font-medium transition-colors"
-                    >Skip</button>
+                    <button onClick={() => log.mutate({ id: s.medicine_id, action: 'taken', time: s.dose_time })} disabled={log.isPending}
+                      className="text-[12px] bg-accent text-accent-text hover:bg-accent-hover px-3.5 py-1.5 rounded-lg transition-colors font-medium">
+                      Taken
+                    </button>
+                    <button onClick={() => log.mutate({ id: s.medicine_id, action: 'skipped', time: s.dose_time })} disabled={log.isPending}
+                      className="text-[12px] border border-border text-tx-2 hover:border-border-strong px-3.5 py-1.5 rounded-lg transition-colors">
+                      Skip
+                    </button>
                   </div>
                 )}
               </div>
@@ -98,37 +95,32 @@ export default function MedicinesPage() {
 
       {tab === 'all' && (
         <>
-          {loadingAll && <div className="text-center py-12 text-slate-400">Loading…</div>}
-          {!loadingAll && !allMeds?.medicines?.length && (
-            <div className="text-center py-12">
-              <div className="text-4xl mb-2">💊</div>
-              <div className="font-medium text-slate-700">No medicines yet</div>
-              <div className="text-sm text-slate-400 mt-1">Add medicines via the AI chat or prescription upload.</div>
+          {l2 && <div className="text-[13px] text-tx-3 py-8 text-center">Loading…</div>}
+          {!l2 && !allMeds?.medicines?.length && (
+            <div className="py-16 text-center border border-dashed border-border rounded-xl">
+              <div className="text-[13px] text-tx-2 font-medium">No medicines yet</div>
+              <div className="text-[12px] text-tx-3 mt-1">Add medicines via Kutumb AI</div>
             </div>
           )}
           <div className="grid sm:grid-cols-2 gap-3">
             {allMeds?.medicines?.map((m: Medicine) => (
-              <div key={m.id} className={cn('bg-white rounded-xl border p-4', m.refill_alert ? 'border-amber-200' : 'border-slate-100')}>
-                <div className="flex items-start justify-between">
+              <div key={m.id} className={cn('bg-surface border rounded-xl p-5', m.refill_alert ? 'border-amber/30' : 'border-border')}>
+                <div className="flex items-start justify-between mb-3">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <span>{m.is_emergency ? '🚑' : '💊'}</span>
-                      <span className="font-semibold text-slate-800 text-sm">{m.name}</span>
-                    </div>
-                    <div className="text-xs text-slate-500 mt-1">{m.dosage} · {m.frequency}</div>
-                    <div className="text-xs text-slate-400 mt-0.5 capitalize">{m.category.replace(/_/g, ' ')}</div>
+                    <div className="text-[14px] font-medium text-tx-1">{m.name}</div>
+                    <div className="text-[12px] text-tx-3 font-mono mt-0.5">{m.dosage} · {m.frequency}</div>
                   </div>
                   {m.is_emergency && (
-                    <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full border border-orange-200">Emergency</span>
+                    <span className="text-[10px] uppercase tracking-wider border border-amber/30 text-amber px-2 py-0.5 rounded-full">
+                      Emergency
+                    </span>
                   )}
                 </div>
+                <div className="text-[11px] uppercase tracking-wider text-tx-3 capitalize">{m.category?.replace(/_/g,' ')}</div>
                 {m.refill_alert && (
-                  <div className="mt-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100">
-                    ⚠️ Refill soon — {m.days_supply_remaining ?? '?'} days left
+                  <div className="mt-3 text-[12px] text-amber border border-amber/20 bg-amber/5 rounded-lg px-3 py-1.5">
+                    Refill in {m.days_supply_remaining ?? '?'} days
                   </div>
-                )}
-                {m.current_stock !== undefined && (
-                  <div className="mt-2 text-xs text-slate-400">Stock: {m.current_stock} units</div>
                 )}
               </div>
             ))}

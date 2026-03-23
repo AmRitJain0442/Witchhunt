@@ -2,38 +2,32 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { aiApi } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { cn, severityBg } from '@/lib/utils';
 
-interface Msg { role: 'user' | 'assistant'; content: string }
-
-interface FiredTrigger { trigger_name: string; message: string; severity: string }
+interface Msg  { role: 'user' | 'assistant'; content: string }
+interface Trig { trigger_name: string; message: string; severity: string }
 
 const WELCOME: Msg = {
   role: 'assistant',
-  content: "Namaste! 🙏 I'm your Kutumb health companion. I have your complete health profile in memory. Ask me anything — medicine interactions, diet advice, symptom analysis, or just how you're doing health-wise.",
+  content: "Namaste. I'm your Kutumb health companion — I have your full medical profile in memory. Ask me anything about your health, medicines, diet, or symptoms.",
 };
 
-const SUGGESTED = [
-  'Can I take paracetamol with my current medicines?',
-  'What should I eat to improve my gut health?',
-  'How is my overall health trending this week?',
-  'Any food I should avoid with my medications?',
+const PROMPTS = [
+  'Any drug interactions I should know about?',
+  'What should I eat to improve my gut score?',
+  'How is my health trending this week?',
   'Suggest an exercise plan for me',
+  'Is it safe to take paracetamol with my medicines?',
 ];
 
-const SEVERITY_STYLE: Record<string, string> = {
-  critical: 'border-red-300 bg-red-50 text-red-700',
-  warning:  'border-amber-300 bg-amber-50 text-amber-700',
-  info:     'border-blue-200 bg-blue-50 text-blue-700',
-};
-
 export default function AIPage() {
-  const [messages,    setMessages]    = useState<Msg[]>([WELCOME]);
-  const [history,     setHistory]     = useState<Msg[]>([]);
-  const [input,       setInput]       = useState('');
-  const [loading,     setLoading]     = useState(false);
-  const [triggers,    setTriggers]    = useState<FiredTrigger[]>([]);
+  const [messages, setMessages]  = useState<Msg[]>([WELCOME]);
+  const [history,  setHistory]   = useState<Msg[]>([]);
+  const [input,    setInput]     = useState('');
+  const [loading,  setLoading]   = useState(false);
+  const [triggers, setTriggers]  = useState<Trig[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textRef   = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
@@ -42,91 +36,93 @@ export default function AIPage() {
     if (!msg || loading) return;
     setInput('');
 
-    const userMsg: Msg = { role: 'user', content: msg };
-    const newHistory = [...history, userMsg];
-    setMessages((p) => [...p, userMsg]);
+    const userMsg: Msg       = { role: 'user', content: msg };
+    const newHistory         = [...history, userMsg];
+    setMessages(p => [...p, userMsg]);
     setHistory(newHistory);
     setLoading(true);
     setTriggers([]);
 
     try {
-      const res = await aiApi.message({
-        message: msg,
-        conversation_history: newHistory,
-        memory_file: {},
-      });
+      const res = await aiApi.message({ message: msg, conversation_history: newHistory, memory_file: {} });
       const assistantMsg: Msg = { role: 'assistant', content: res.reply };
-      setMessages((p) => [...p, assistantMsg]);
+      setMessages(p => [...p, assistantMsg]);
       setHistory([...newHistory, assistantMsg]);
       if (res.fired_triggers?.length) setTriggers(res.fired_triggers);
-    } catch (err: unknown) {
-      setMessages((p) => [...p, { role: 'assistant', content: "I'm having trouble connecting right now. Please try again." }]);
+    } catch {
+      setMessages(p => [...p, { role: 'assistant', content: 'Connection error. Please try again.' }]);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  };
+
   return (
-    <div className="flex flex-col h-screen max-h-screen">
+    <div className="flex flex-col h-screen">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-slate-100 bg-white shrink-0">
-        <h1 className="text-lg font-bold text-slate-900">🤖 Kutumb AI</h1>
-        <p className="text-xs text-slate-400 mt-0.5">Powered by Claude · Remembers your health profile</p>
+      <div className="px-8 h-14 flex items-center border-b border-border bg-surface shrink-0">
+        <div>
+          <span className="text-[13px] font-medium text-tx-1">Kutumb AI</span>
+          <span className="ml-3 text-[11px] text-tx-3">Powered by Claude · Health-aware</span>
+        </div>
       </div>
 
-      {/* Trigger banners */}
+      {/* Triggers */}
       {triggers.length > 0 && (
-        <div className="px-4 py-2 space-y-2 shrink-0">
+        <div className="px-6 pt-3 space-y-2 shrink-0">
           {triggers.map((t, i) => (
-            <div key={i} className={cn('rounded-xl border px-4 py-2 text-sm', SEVERITY_STYLE[t.severity] ?? SEVERITY_STYLE.info)}>
-              <strong>{t.trigger_name}:</strong> {t.message}
+            <div key={i} className={cn('rounded-lg border px-4 py-2.5 text-[13px]', severityBg(t.severity))}>
+              <strong className="font-medium">{t.trigger_name}</strong>
+              <span className="mx-1.5 opacity-40">·</span>
+              {t.message}
             </div>
           ))}
         </div>
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
         {messages.map((m, i) => (
           <div key={i} className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
+            {m.role === 'assistant' && (
+              <div className="w-5 h-5 rounded-full bg-accent-muted text-accent text-[9px] flex items-center justify-center shrink-0 mt-0.5 mr-2.5 font-mono">
+                K
+              </div>
+            )}
             <div className={cn(
-              'max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
+              'max-w-[70%] rounded-2xl px-4 py-3 text-[14px] leading-relaxed',
               m.role === 'user'
-                ? 'bg-emerald-600 text-white rounded-br-sm'
-                : 'bg-white border border-slate-100 text-slate-800 rounded-bl-sm shadow-sm',
+                ? 'bg-accent text-accent-text rounded-br-sm'
+                : 'bg-surface border border-border text-tx-1 rounded-bl-sm',
             )}>
-              {m.role === 'assistant' && (
-                <div className="text-xs text-emerald-600 font-semibold mb-1">🌿 Kutumb AI</div>
-              )}
               <div className="whitespace-pre-wrap">{m.content}</div>
             </div>
           </div>
         ))}
 
         {loading && (
-          <div className="flex justify-start">
-            <div className="bg-white border border-slate-100 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
-              <div className="text-xs text-emerald-600 font-semibold mb-1">🌿 Kutumb AI</div>
-              <div className="flex gap-1 items-center">
-                {[0, 150, 300].map((d) => (
-                  <div key={d} className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
+          <div className="flex justify-start items-start gap-2.5">
+            <div className="w-5 h-5 rounded-full bg-accent-muted text-accent text-[9px] flex items-center justify-center shrink-0 mt-0.5 font-mono">K</div>
+            <div className="bg-surface border border-border rounded-2xl rounded-bl-sm px-4 py-3.5">
+              <div className="flex gap-1.5 items-center">
+                {[0,100,200].map(d => (
+                  <div key={d} className="w-1.5 h-1.5 bg-tx-3 rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
                 ))}
               </div>
             </div>
           </div>
         )}
 
-        {/* Suggested prompts (only at start) */}
+        {/* Suggested prompts */}
         {messages.length === 1 && !loading && (
-          <div className="space-y-2 pt-2">
-            <p className="text-xs text-slate-400 text-center">Try asking:</p>
-            {SUGGESTED.map((s, i) => (
-              <button
-                key={i}
-                onClick={() => send(s)}
-                className="w-full text-left text-sm bg-white border border-slate-100 rounded-xl px-4 py-2.5 text-slate-600 hover:border-emerald-300 hover:text-emerald-700 transition-colors shadow-sm"
-              >
-                {s}
+          <div className="ml-7 space-y-1.5">
+            {PROMPTS.map((p, i) => (
+              <button key={i} onClick={() => send(p)}
+                className="block w-full text-left text-[13px] border border-border bg-surface hover:border-border-strong hover:bg-surface-raised text-tx-2 hover:text-tx-1 rounded-xl px-4 py-2.5 transition-all">
+                {p}
               </button>
             ))}
           </div>
@@ -136,25 +132,26 @@ export default function AIPage() {
       </div>
 
       {/* Input */}
-      <div className="px-4 py-3 border-t border-slate-100 bg-white shrink-0">
-        <div className="flex gap-2 items-end">
+      <div className="px-6 py-4 border-t border-border bg-surface shrink-0">
+        <div className="flex gap-3 items-end">
           <textarea
+            ref={textRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-            placeholder="Ask anything about your health…"
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Ask about your health…"
             rows={1}
-            className="flex-1 resize-none border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 placeholder-slate-300 max-h-28"
+            className="flex-1 resize-none bg-bg border border-border focus:border-border-strong rounded-xl px-4 py-2.5 text-[14px] text-tx-1 placeholder:text-tx-3 outline-none transition-colors max-h-32"
           />
           <button
             onClick={() => send()}
             disabled={!input.trim() || loading}
-            className="shrink-0 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white w-10 h-10 rounded-xl flex items-center justify-center transition-colors"
+            className="w-9 h-9 rounded-xl bg-accent hover:bg-accent-hover disabled:opacity-30 text-accent-text flex items-center justify-center transition-colors shrink-0 text-[13px]"
           >
-            <span className="text-base">➤</span>
+            ↑
           </button>
         </div>
-        <p className="text-xs text-slate-300 mt-1.5 text-center">Enter to send · Shift+Enter for new line</p>
+        <div className="text-[11px] text-tx-3 mt-1.5 text-center">Enter to send · Shift+Enter for newline</div>
       </div>
     </div>
   );
