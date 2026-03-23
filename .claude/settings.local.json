@@ -14,7 +14,13 @@
       "Bash(npx create-expo-app@latest mobile --template blank-typescript)",
       "Bash(npx expo:*)",
       "Bash(npx tsc:*)",
-      "Bash(npx create-next-app@latest web --typescript --tailwind --eslint --app --src-dir --no-import-alias)"
+      "Bash(npx create-next-app@latest web --typescript --tailwind --eslint --app --src-dir --no-import-alias)",
+      "Bash(npx create-next-app@latest web --typescript --tailwind --eslint --app --src-dir --no-import-alias --yes)",
+      "Bash(npm install:*)",
+      "Bash(for dir:*)",
+      "Bash(do)",
+      "Bash(cp \"C:/Users/amrit/hackathons/witchhunt/web/src/app/dashboard/layout.tsx\" \"C:/Users/amrit/hackathons/witchhunt/web/src/app/$dir/layout.tsx\")",
+      "Bash(done)"
     ]
   }
 }
