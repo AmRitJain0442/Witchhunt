@@ -104,3 +104,7 @@ NotFoundError(404), AlreadyExistsError(409), ForbiddenError(403), UnauthorizedEr
 #### [✓] step-3: Read all backend routers (API endpoints)
 - **Agent:** claude-cli-worker  **Time:** 2026-03-24 12:08:06  **Status:** approved
 - Complete API catalog produced in docs/api_catalog.md covering all 14 router files and 85 endpoints. Every endpoint documented with HTTP method, path, auth requirement, request body, response model, status code, and service function. Includes architectural observations (stateless AI sessions, inline Firestore in 3 insight endpoints, path ordering discipline, public surface of 3 endpoints).
+
+#### [✓] step-4: Read all backend services (business logic)
+- **Agent:** claude-cli-worker  **Time:** 2026-03-24 12:11:26  **Status:** approved
+- Complete business logic map of all 14 backend services written to docs/services_map.md. Covers per-service Firestore collections (read/write), external APIs (Anthropic Claude, Firebase Auth/Storage/Messaging, Twilio, WeasyPrint), health scoring algorithm with organ weights, AI insight caching strategy, cross-service Firestore collection dependency matrix, and 7 key architectural observations including the stub Google Fit OAuth and external OCR/transcription workers.
