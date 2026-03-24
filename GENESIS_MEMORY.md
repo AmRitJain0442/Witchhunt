@@ -108,3 +108,7 @@ NotFoundError(404), AlreadyExistsError(409), ForbiddenError(403), UnauthorizedEr
 #### [✓] step-4: Read all backend services (business logic)
 - **Agent:** claude-cli-worker  **Time:** 2026-03-24 12:11:26  **Status:** approved
 - Complete business logic map of all 14 backend services written to docs/services_map.md. Covers per-service Firestore collections (read/write), external APIs (Anthropic Claude, Firebase Auth/Storage/Messaging, Twilio, WeasyPrint), health scoring algorithm with organ weights, AI insight caching strategy, cross-service Firestore collection dependency matrix, and 7 key architectural observations including the stub Google Fit OAuth and external OCR/transcription workers.
+
+#### [✓] step-5: Read mobile app: navigation, auth, screens
+- **Agent:** claude-cli-worker  **Time:** 2026-03-24 12:15:24  **Status:** approved
+- Complete mobile app map written to docs/mobile_map.md. Covers: Expo 55 + React Navigation 6 structure, Firebase native auth with Axios token injection, 5-tab bottom navigator (Home/Checkin/Medicines/AIChat/Family), onboarding flow gated on date_of_birth, all API modules (auth/ai/family/health), TypeScript types, design system tokens, local AI memory via SecureStore with JSON-patch engine, and 8 architectural observations.
