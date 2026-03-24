@@ -112,3 +112,7 @@ NotFoundError(404), AlreadyExistsError(409), ForbiddenError(403), UnauthorizedEr
 #### [✓] step-5: Read mobile app: navigation, auth, screens
 - **Agent:** claude-cli-worker  **Time:** 2026-03-24 12:15:24  **Status:** approved
 - Complete mobile app map written to docs/mobile_map.md. Covers: Expo 55 + React Navigation 6 structure, Firebase native auth with Axios token injection, 5-tab bottom navigator (Home/Checkin/Medicines/AIChat/Family), onboarding flow gated on date_of_birth, all API modules (auth/ai/family/health), TypeScript types, design system tokens, local AI memory via SecureStore with JSON-patch engine, and 8 architectural observations.
+
+#### [✓] step-6: Read web app: layout, pages, components, libs
+- **Agent:** claude-cli-worker  **Time:** 2026-03-24 12:22:01  **Status:** approved
+- Complete web app map written to docs/web_map.md covering Next.js App Router structure (8 routes), Firebase auth flow with dual state (FirebaseUser + backend AppUser), Axios+React Query API client (9 modules), AppShell auth guard, all page features, TailwindCSS v4 design tokens, and 8 architectural observations.
