@@ -96,3 +96,7 @@ NotFoundError(404), AlreadyExistsError(409), ForbiddenError(403), UnauthorizedEr
 #### [✓] step-1: Read backend core: config, main, dependencies, firebase
 - **Agent:** claude-cli-worker  **Time:** 2026-03-24 11:55:55  **Status:** approved
 - Backend core skeleton fully documented: FastAPI 1.0.0 with 14 routers at /api/v1/, Firebase auth via ID token verification with TTLCache, async Firestore client, family permission model in Firestore subcollections, IST canonical timezone, and pydantic-settings config from .env.
+
+#### [✓] step-2: Read all backend Pydantic models
+- **Agent:** claude-cli-worker  **Time:** 2026-03-24 11:59:17  **Status:** approved
+- Complete map of all 14 Pydantic model files produced with accurate field listings, validators, cross-model Firestore relationships, and architectural patterns (stateless AI sessions, async OCR, dual-source vitals, trigger system, 7-stage onboarding).
