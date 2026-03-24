@@ -100,3 +100,7 @@ NotFoundError(404), AlreadyExistsError(409), ForbiddenError(403), UnauthorizedEr
 #### [✓] step-2: Read all backend Pydantic models
 - **Agent:** claude-cli-worker  **Time:** 2026-03-24 11:59:17  **Status:** approved
 - Complete map of all 14 Pydantic model files produced with accurate field listings, validators, cross-model Firestore relationships, and architectural patterns (stateless AI sessions, async OCR, dual-source vitals, trigger system, 7-stage onboarding).
+
+#### [✓] step-3: Read all backend routers (API endpoints)
+- **Agent:** claude-cli-worker  **Time:** 2026-03-24 12:08:06  **Status:** approved
+- Complete API catalog produced in docs/api_catalog.md covering all 14 router files and 85 endpoints. Every endpoint documented with HTTP method, path, auth requirement, request body, response model, status code, and service function. Includes architectural observations (stateless AI sessions, inline Firestore in 3 insight endpoints, path ordering discipline, public surface of 3 endpoints).
