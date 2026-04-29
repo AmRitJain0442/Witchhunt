@@ -225,6 +225,15 @@ export const medicineApi = {
     medicines: r.data.medicines?.map((m: Record<string, unknown>) => normalizeMedicine(m)),
   })),
   create: (d: unknown) => api.post('/medicines/', d).then(r => normalizeMedicine(r.data)),
+  uploadPrescription: (fd: FormData) =>
+    api.post('/medicines/prescriptions/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data),
+  extractionStatus: (jobId: string) =>
+    api.get(`/medicines/prescriptions/extraction-status/${jobId}`).then(r => r.data),
+  importPrescriptionMedicines: (prescriptionId: string, payload?: unknown) =>
+    api.post(`/medicines/prescriptions/${prescriptionId}/import-medicines`, payload ?? {}).then(r => ({
+      ...r.data,
+      imported: r.data.imported?.map((m: Record<string, unknown>) => normalizeMedicine(m)) ?? [],
+    })),
   logDose: (id: string, action: string, time: string) =>
     api.post(`/medicines/${id}/log`, {
       action,

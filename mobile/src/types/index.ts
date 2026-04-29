@@ -96,6 +96,52 @@ export interface Medicine {
   notes?: string;
 }
 
+export interface ExtractedMedicine {
+  name: string;
+  generic_name?: string;
+  dosage: string;
+  frequency: string;
+  every_x_hours?: number;
+  duration?: string;
+  category?: string;
+  dose_times?: { time: string; dose_amount: number; dose_unit: string }[];
+  instructions?: string;
+  confidence?: number;
+  matched_to_medicine_id?: string;
+}
+
+export interface Prescription {
+  prescription_id: string;
+  prescribed_date: string;
+  doctor_name?: string;
+  hospital_name?: string;
+  file_url: string;
+  status: 'uploaded' | 'processing' | 'parsed' | 'failed';
+  ocr_job_id?: string;
+  extracted_medicines: ExtractedMedicine[];
+  ocr_confidence_score?: number;
+  raw_ocr_text?: string;
+  is_valid: boolean;
+  expires_at?: string;
+  notes?: string;
+}
+
+export interface PrescriptionExtractionStatus {
+  job_id: string;
+  prescription_id: string;
+  status: string;
+  progress_pct: number;
+  medicines_found: number;
+  engine?: string;
+  error_message?: string;
+}
+
+export interface PrescriptionMedicineImportResponse {
+  prescription_id: string;
+  imported: Medicine[];
+  skipped: Record<string, unknown>[];
+}
+
 export interface DoseSchedule {
   medicine_id: string;
   medicine_name: string;

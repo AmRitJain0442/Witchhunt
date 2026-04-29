@@ -87,9 +87,11 @@
 |--------|------|------|---------|----------------|--------|---------|
 | POST | `/prescriptions/upload` | ✓ | Form(`prescribed_date`, `doctor_name?`, `hospital_name?`, `notes?`) + `UploadFile` (JPEG/PNG/WebP/PDF ≤ 20 MB) | `PrescriptionResponse` | 201 | `prescription_service.upload_prescription` |
 | GET | `/prescriptions/ocr-status/{job_id}` | ✓ | — | `PrescriptionOCRStatusResponse` | 200 | `prescription_service.get_ocr_status` |
+| GET | `/prescriptions/extraction-status/{job_id}` | ✓ | — | `PrescriptionOCRStatusResponse` | 200 | `prescription_service.get_ocr_status` |
 | GET | `/prescriptions` | ✓ | Query: `is_valid?`, `limit=20`, `offset=0` | `PrescriptionListResponse` | 200 | `prescription_service.list_prescriptions` |
 | GET | `/prescriptions/{prescription_id}` | ✓ | — | `PrescriptionResponse` | 200 | `prescription_service.get_prescription` |
 | PATCH | `/prescriptions/{prescription_id}` | ✓ | `PrescriptionCorrectionRequest` | `PrescriptionResponse` | 200 | `prescription_service.correct_prescription` |
+| POST | `/prescriptions/{prescription_id}/import-medicines` | ✓ | `PrescriptionMedicineImportRequest` | `PrescriptionMedicineImportResponse` | 201 | `prescription_service.import_prescription_medicines` |
 | DELETE | `/prescriptions/{prescription_id}` | ✓ | — | `MessageResponse` | 200 | `prescription_service.delete_prescription` |
 
 ### 5b. Static Medicine Endpoints (before `/{medicine_id}`)
@@ -329,7 +331,7 @@ Escalation logic: if value exceeds `sos_threshold`/`sos_threshold_systolic`, `Fi
 | users | users.py | 4 |
 | family | family.py | 8 |
 | checkins | checkins.py | 9 |
-| medicines | medicines.py | 16 (6 prescription + 2 static + 8 CRUD/sub) |
+| medicines | medicines.py | 18 (8 prescription + 2 static + 8 CRUD/sub) |
 | health | health.py | 7 |
 | lab_reports | lab_reports.py | 7 |
 | emergency | emergency.py | 5 |

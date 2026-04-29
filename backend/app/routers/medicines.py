@@ -19,6 +19,8 @@ from app.models.medicines import (
 from app.models.prescriptions import (
     PrescriptionCorrectionRequest,
     PrescriptionListResponse,
+    PrescriptionMedicineImportRequest,
+    PrescriptionMedicineImportResponse,
     PrescriptionOCRStatusResponse,
     PrescriptionResponse,
 )
@@ -73,7 +75,7 @@ async def upload_prescription(
     )
     if response.ocr_job_id:
         background_tasks.add_task(
-            prescription_service.process_prescription_ocr,
+            prescription_service.process_prescription_extraction,
             current_user.uid,
             response.prescription_id,
             response.ocr_job_id,
@@ -86,6 +88,19 @@ async def upload_prescription(
 
 @router.get("/prescriptions/ocr-status/{job_id}", response_model=PrescriptionOCRStatusResponse)
 async def get_ocr_status(
+    job_id: str,
+    current_user: CurrentUserDep,
+    db: DB,
+):
+    return await prescription_service.get_ocr_status(
+        uid=current_user.uid,
+        job_id=job_id,
+        db=db,
+    )
+
+
+@router.get("/prescriptions/extraction-status/{job_id}", response_model=PrescriptionOCRStatusResponse)
+async def get_extraction_status(
     job_id: str,
     current_user: CurrentUserDep,
     db: DB,
@@ -135,6 +150,25 @@ async def correct_prescription(
     db: DB,
 ):
     return await prescription_service.correct_prescription(
+        uid=current_user.uid,
+        prescription_id=prescription_id,
+        req=req,
+        db=db,
+    )
+
+
+@router.post(
+    "/prescriptions/{prescription_id}/import-medicines",
+    response_model=PrescriptionMedicineImportResponse,
+    status_code=201,
+)
+async def import_prescription_medicines(
+    prescription_id: str,
+    req: PrescriptionMedicineImportRequest,
+    current_user: CurrentUserDep,
+    db: DB,
+):
+    return await prescription_service.import_prescription_medicines(
         uid=current_user.uid,
         prescription_id=prescription_id,
         req=req,

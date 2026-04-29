@@ -48,7 +48,8 @@
 
 ### AI & Processing
 - **Claude API (`claude-sonnet-4-6`)** — health intelligence, session AI, memory updates
-- **Google Cloud Vision API** — OCR for prescriptions and lab reports
+- **Gemini 2.5 Flash** — prescription medicine extraction from images/PDFs
+- **Google Cloud Vision API** — OCR for lab reports
 - **Google Cloud Speech-to-Text / OpenAI Whisper** — voice transcription
 - **WeasyPrint + Jinja2** — doctor referral PDF generation
 
@@ -510,11 +511,13 @@ category NOT in EMERGENCY_CATEGORIES  →  prescription_id required + validated
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/prescriptions/upload` | Upload image/PDF → OCR extracts medicines + doctor info |
-| `GET` | `/prescriptions/ocr-status/{job_id}` | Poll OCR parsing status |
+| `POST` | `/prescriptions/upload` | Upload image/PDF → Gemini extracts medicines + doctor info |
+| `GET` | `/prescriptions/ocr-status/{job_id}` | Backward-compatible extraction status |
+| `GET` | `/prescriptions/extraction-status/{job_id}` | Poll Gemini extraction status |
 | `GET` | `/prescriptions` | List all prescriptions |
 | `GET` | `/prescriptions/{id}` | Single prescription with matched medicine cabinet entries |
-| `PATCH` | `/prescriptions/{id}` | Manually correct OCR-parsed fields |
+| `PATCH` | `/prescriptions/{id}` | Manually correct Gemini-parsed fields |
+| `POST` | `/prescriptions/{id}/import-medicines` | Create medicine cabinet entries from extracted medicines |
 | `DELETE` | `/prescriptions/{id}` | Delete (blocked if active medicines link to it) |
 
 ### Medicine Endpoints
@@ -540,8 +543,12 @@ class ExtractedMedicine(BaseModel):
     generic_name: str | None
     dosage: str
     frequency: str
+    every_x_hours: int | None
     duration: str | None
+    category: MedicineCategory
+    dose_times: list[DoseTime]
     instructions: str | None
+    confidence: float | None
     matched_to_medicine_id: str | None    # Populated if already in cabinet
 
 class PrescriptionResponse(BaseModel):
@@ -599,12 +606,12 @@ class MedicineResponse(BaseModel):
 ```
 1. Upload prescription photo
          ↓
-2. OCR parses → ExtractedMedicine[] list
+2. Gemini 2.5 Flash extracts → ExtractedMedicine[] list
          ↓
 3. User reviews + corrects if needed
          ↓
-4. POST /medicines with prescription_id
-   (name pre-filled from ExtractedMedicine)
+4. POST /medicines/prescriptions/{id}/import-medicines
+   (creates medicines from reviewed ExtractedMedicine entries)
          ↓
 5. Backend validates: exists, is_valid, not expired
          ↓
@@ -1724,7 +1731,7 @@ app_config/scoring_weights
 5. **Users module** — profile CRUD
 
 ### Phase 2 — Core Health Data (Days 3–6)
-6. **Prescriptions module** — upload + OCR parsing
+6. **Prescriptions module** — upload + Gemini medicine extraction
 7. **Medicines module** — full CRUD + prescription validation + dose logging
 8. **Check-ins module** — submission + voice + streak
 9. **`app/services/notification_service.py`** — shared by emergency + medicine alerts

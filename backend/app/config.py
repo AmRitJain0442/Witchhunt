@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     # Google Cloud
     google_application_credentials: str = "./serviceAccountKey.json"
 
+    # Gemini
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
+
     # OpenAI (Whisper fallback)
     openai_api_key: str = ""
 

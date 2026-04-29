@@ -7,6 +7,9 @@ import {
   TodayScheduleResponse,
   Medicine,
   LabReport,
+  Prescription,
+  PrescriptionExtractionStatus,
+  PrescriptionMedicineImportResponse,
 } from '../types';
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -144,6 +147,43 @@ export const listMedicines = () =>
   client.get<{ medicines: Record<string, unknown>[] }>('/medicines/').then((r) => ({
     ...r.data,
     medicines: r.data.medicines.map(normalizeMedicine),
+  }));
+
+export const uploadPrescription = (
+  uri: string,
+  prescribedDate = todayIso(),
+  fields?: { doctor_name?: string; hospital_name?: string; notes?: string; content_type?: string },
+) => {
+  const contentType = fields?.content_type ?? 'image/jpeg';
+  const ext = contentType === 'application/pdf' ? 'pdf' : contentType.split('/')[1] ?? 'jpg';
+  const form = new FormData();
+  form.append('prescribed_date', prescribedDate);
+  if (fields?.doctor_name) form.append('doctor_name', fields.doctor_name);
+  if (fields?.hospital_name) form.append('hospital_name', fields.hospital_name);
+  if (fields?.notes) form.append('notes', fields.notes);
+  form.append('file', {
+    uri,
+    name: `prescription-${prescribedDate}.${ext}`,
+    type: contentType,
+  } as unknown as Blob);
+  return client.post<Prescription>('/medicines/prescriptions/upload', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then((r) => r.data);
+};
+
+export const getPrescriptionExtractionStatus = (jobId: string) =>
+  client.get<PrescriptionExtractionStatus>(`/medicines/prescriptions/extraction-status/${jobId}`).then((r) => r.data);
+
+export const importPrescriptionMedicines = (
+  prescriptionId: string,
+  payload?: { selected_indexes?: number[]; current_stock_default?: number; reorder_threshold_default?: number; start_date?: string },
+) =>
+  client.post<PrescriptionMedicineImportResponse>(
+    `/medicines/prescriptions/${prescriptionId}/import-medicines`,
+    payload ?? {},
+  ).then((r) => ({
+    ...r.data,
+    imported: r.data.imported.map((medicine) => normalizeMedicine(medicine as unknown as Record<string, unknown>)),
   }));
 
 export const logDose = (medicineId: string, action: 'taken' | 'skipped', scheduledTime: string) =>

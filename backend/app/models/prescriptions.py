@@ -1,8 +1,9 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from app.core.enums import PrescriptionStatus
+from app.core.enums import MedicineCategory, PrescriptionStatus
+from app.models.medicines import DoseTime, MedicineResponse
 
 
 class ExtractedMedicine(BaseModel):
@@ -10,8 +11,12 @@ class ExtractedMedicine(BaseModel):
     generic_name: str | None = None
     dosage: str
     frequency: str
+    every_x_hours: int | None = None
     duration: str | None = None
+    category: MedicineCategory = MedicineCategory.OTHER_PRESCRIBED
+    dose_times: list[DoseTime] = Field(default_factory=list)
     instructions: str | None = None
+    confidence: float | None = None
     matched_to_medicine_id: str | None = None
 
 
@@ -55,4 +60,18 @@ class PrescriptionOCRStatusResponse(BaseModel):
     status: str
     progress_pct: int = 0
     medicines_found: int = 0
+    engine: str | None = None
     error_message: str | None = None
+
+
+class PrescriptionMedicineImportRequest(BaseModel):
+    selected_indexes: list[int] | None = None
+    current_stock_default: int = Field(default=30, ge=0)
+    reorder_threshold_default: int = Field(default=7, ge=0)
+    start_date: date | None = None
+
+
+class PrescriptionMedicineImportResponse(BaseModel):
+    prescription_id: str
+    imported: list[MedicineResponse] = Field(default_factory=list)
+    skipped: list[dict] = Field(default_factory=list)
