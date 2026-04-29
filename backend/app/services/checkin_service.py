@@ -1,8 +1,11 @@
+import io
+import logging
 from datetime import date, datetime, timedelta, timezone
 from uuid import uuid4
 
 from google.cloud.firestore import AsyncClient
 
+from app.config import get_settings
 from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError
 from app.core.firebase import get_storage_bucket
 from app.models.checkins import (
@@ -16,6 +19,29 @@ from app.models.checkins import (
     VoiceUploadResponse,
 )
 from app.core.enums import MoodLevel
+
+logger = logging.getLogger(__name__)
+settings = get_settings()
+
+_SYMPTOM_KEYWORDS: dict[str, list[str]] = {
+    "headache": ["headache", "sir dard", "sar dard", "सिर दर्द"],
+    "fatigue": ["tired", "fatigue", "weak", "kamzori", "thakan", "थकान"],
+    "nausea": ["nausea", "vomit", "ulti", "उल्टी"],
+    "chest pain": ["chest pain", "chest tight", "seene", "सीने", "छाती"],
+    "shortness of breath": ["breath", "saans", "सांस", "breathing"],
+    "dizziness": ["dizzy", "chakkar", "चक्कर"],
+    "cough": ["cough", "khansi", "खांसी"],
+    "fever": ["fever", "bukhar", "बुखार"],
+    "joint pain": ["joint pain", "jodon", "घुटना", "knee pain"],
+    "stomach pain": ["stomach", "pet dard", "पेट", "abdominal"],
+}
+
+_MOOD_KEYWORDS: list[tuple[MoodLevel, list[str]]] = [
+    (MoodLevel.TERRIBLE, ["terrible", "very bad", "bahut kharab", "बहुत खराब"]),
+    (MoodLevel.BAD, ["bad", "low", "kharab", "ठीक नहीं"]),
+    (MoodLevel.GOOD, ["good", "fine", "theek", "ठीक"]),
+    (MoodLevel.GREAT, ["great", "excellent", "bahut achha", "बहुत अच्छा"]),
+]
 
 
 def _doc_to_checkin_response(data: dict) -> CheckinResponse:
@@ -408,6 +434,159 @@ async def get_transcription_status(
         parsed_symptoms=data.get("parsed_symptoms", []),
         parsed_mood=parsed_mood,
     )
+
+
+def _parse_symptoms(transcription: str) -> list[str]:
+    text = transcription.lower()
+    symptoms: list[str] = []
+    for symptom, keywords in _SYMPTOM_KEYWORDS.items():
+        if any(keyword.lower() in text for keyword in keywords):
+            symptoms.append(symptom)
+    return symptoms
+
+
+def _parse_mood(transcription: str) -> MoodLevel | None:
+    text = transcription.lower()
+    for mood, keywords in _MOOD_KEYWORDS:
+        if any(keyword.lower() in text for keyword in keywords):
+            return mood
+    return None
+
+
+async def _transcribe_with_openai(file_bytes: bytes, content_type: str) -> str | None:
+    if not settings.openai_api_key:
+        return None
+    try:
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(api_key=settings.openai_api_key)
+        audio_file = io.BytesIO(file_bytes)
+        audio_file.name = "voice_checkin.m4a" if "mp4" in content_type or "m4a" in content_type else "voice_checkin.mp3"
+        response = await client.audio.transcriptions.create(
+            model="whisper-1",
+            file=audio_file,
+            response_format="json",
+        )
+        return getattr(response, "text", None)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("OpenAI transcription failed: %s", exc)
+        return None
+
+
+async def _transcribe_with_google(file_bytes: bytes, content_type: str) -> str | None:
+    try:
+        from google.cloud import speech
+
+        client = speech.SpeechAsyncClient()
+        encoding = speech.RecognitionConfig.AudioEncoding.ENCODING_UNSPECIFIED
+        if content_type == "audio/mpeg":
+            encoding = speech.RecognitionConfig.AudioEncoding.MP3
+        audio = speech.RecognitionAudio(content=file_bytes)
+        config = speech.RecognitionConfig(
+            encoding=encoding,
+            language_code="hi-IN",
+            alternative_language_codes=["en-IN", "en-US"],
+            enable_automatic_punctuation=True,
+        )
+        response = await client.recognize(config=config, audio=audio)
+        return " ".join(
+            result.alternatives[0].transcript
+            for result in response.results
+            if result.alternatives
+        ).strip() or None
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Google Speech transcription failed: %s", exc)
+        return None
+
+
+async def process_transcription_job(
+    uid: str,
+    job_id: str,
+    checkin_date: date,
+    file_bytes: bytes,
+    content_type: str,
+    db: AsyncClient,
+) -> None:
+    job_ref = (
+        db.collection("users")
+        .document(uid)
+        .collection("transcription_jobs")
+        .document(job_id)
+    )
+    now = datetime.now(timezone.utc)
+    job_doc = await job_ref.get()
+    job_data = job_doc.to_dict() if job_doc.exists else {}
+    voice_note_url = job_data.get("voice_note_url")
+    await job_ref.update({"status": "processing", "updated_at": now})
+
+    transcription = await _transcribe_with_openai(file_bytes, content_type)
+    if not transcription:
+        transcription = await _transcribe_with_google(file_bytes, content_type)
+
+    if not transcription:
+        await job_ref.update({
+            "status": "failed",
+            "error_message": "No transcription provider is configured or all providers failed.",
+            "updated_at": datetime.now(timezone.utc),
+        })
+        return
+
+    parsed_symptoms = _parse_symptoms(transcription)
+    parsed_mood = _parse_mood(transcription)
+    await job_ref.update({
+        "status": "completed",
+        "transcription": transcription,
+        "parsed_symptoms": parsed_symptoms,
+        "parsed_mood": parsed_mood.value if parsed_mood else None,
+        "updated_at": datetime.now(timezone.utc),
+    })
+
+    date_str = checkin_date.isoformat()
+    checkin_ref = (
+        db.collection("users")
+        .document(uid)
+        .collection("checkins")
+        .document(date_str)
+    )
+    existing = await checkin_ref.get()
+    if existing.exists:
+        data = existing.to_dict()
+        symptoms = sorted(set(data.get("symptoms", []) + parsed_symptoms))
+        updates: dict = {
+            "voice_transcription": transcription,
+            "symptoms": symptoms,
+            "updated_at": datetime.now(timezone.utc),
+        }
+        if parsed_mood and not data.get("mood"):
+            updates["mood"] = parsed_mood.value
+        await checkin_ref.update(updates)
+        return
+
+    checkin_data: dict = {
+        "checkin_id": date_str,
+        "uid": uid,
+        "checkin_date": date_str,
+        "mood": (parsed_mood or MoodLevel.NEUTRAL).value,
+        "energy_level": 5,
+        "pain_present": bool({"chest pain", "stomach pain", "joint pain"} & set(parsed_symptoms)),
+        "pain_level": None,
+        "pain_locations": [],
+        "sleep_hours": None,
+        "sleep_quality": None,
+        "stress_level": None,
+        "meals": [],
+        "medicine_adherence_ids": [],
+        "symptoms": parsed_symptoms,
+        "voice_note_url": voice_note_url,
+        "voice_transcription": transcription,
+        "water_intake_ml": None,
+        "bowel_movement": None,
+        "notes": None,
+        "organ_scores_snapshot": {},
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+    }
+    await checkin_ref.set(checkin_data)
 
 
 async def save_meal_photo(

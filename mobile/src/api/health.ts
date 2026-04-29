@@ -121,6 +121,22 @@ export const listCheckins = (params?: { limit?: number; offset?: number }) =>
 export const getTodaysCheckin = () =>
   client.get<Record<string, unknown> | null>('/checkins/today').then((r) => normalizeCheckin(r.data));
 
+export const uploadVoiceCheckin = (uri: string, checkinDate = todayIso()) => {
+  const form = new FormData();
+  form.append('checkin_date', checkinDate);
+  form.append('file', {
+    uri,
+    name: `voice-${checkinDate}.m4a`,
+    type: 'audio/m4a',
+  } as unknown as Blob);
+  return client.post('/checkins/voice', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then((r) => r.data);
+};
+
+export const getTranscriptionStatus = (jobId: string) =>
+  client.get(`/checkins/voice/transcription/${jobId}`).then((r) => r.data);
+
 export const getTodaySchedule = () =>
   client.get<Record<string, unknown>>('/medicines/today').then((r) => normalizeSchedule(r.data));
 

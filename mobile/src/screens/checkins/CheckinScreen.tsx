@@ -9,7 +9,8 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { createCheckin, getTodaysCheckin } from '../../api/health';
+import { Audio } from 'expo-av';
+import { createCheckin, getTodaysCheckin, uploadVoiceCheckin } from '../../api/health';
 import { CheckinCreateRequest } from '../../types';
 import { COLORS, FONTS, SPACING, RADIUS } from '../../constants';
 
@@ -51,6 +52,9 @@ export default function CheckinScreen() {
   const [existing, setExisting] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [voiceUploading, setVoiceUploading] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
 
   const [mood, setMood] = useState<number | undefined>();
   const [energy, setEnergy] = useState<number | undefined>();
@@ -116,6 +120,41 @@ export default function CheckinScreen() {
     }
   };
 
+  const toggleVoiceRecording = async () => {
+    try {
+      if (recording) {
+        setVoiceUploading(true);
+        setVoiceStatus('Uploading voice check-in...');
+        await recording.stopAndUnloadAsync();
+        const uri = recording.getURI();
+        setRecording(null);
+        if (!uri) throw new Error('Recording file was not created.');
+        const res = await uploadVoiceCheckin(uri);
+        setVoiceStatus(`Voice check-in queued (${res.transcription_job_id}).`);
+        setExisting(true);
+        return;
+      }
+
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Microphone permission needed', 'Please allow microphone access to record a voice check-in.');
+        return;
+      }
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+      const created = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      setRecording(created.recording);
+      setVoiceStatus('Recording...');
+    } catch (err: unknown) {
+      Alert.alert('Voice check-in failed', err instanceof Error ? err.message : 'Please try again.');
+      setRecording(null);
+    } finally {
+      setVoiceUploading(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -134,6 +173,21 @@ export default function CheckinScreen() {
           {existing ? 'You can update your check-in anytime.' : 'Takes 2 minutes. Log daily for best results.'}
         </Text>
       </View>
+
+      <TouchableOpacity
+        style={[styles.voiceButton, recording && styles.voiceButtonActive]}
+        onPress={toggleVoiceRecording}
+        disabled={voiceUploading}
+      >
+        {voiceUploading ? (
+          <ActivityIndicator color={COLORS.text.inverse} />
+        ) : (
+          <Text style={styles.voiceButtonText}>
+            {recording ? 'Stop and upload voice check-in' : 'Record voice check-in'}
+          </Text>
+        )}
+      </TouchableOpacity>
+      {voiceStatus && <Text style={styles.voiceStatus}>{voiceStatus}</Text>}
 
       <EmojiSlider
         label="Mood"
@@ -258,6 +312,27 @@ const styles = StyleSheet.create({
     color: COLORS.text.inverse,
   },
   headerSub: { color: 'rgba(255,255,255,0.85)', fontSize: FONTS.sizes.sm, marginTop: 4 },
+  voiceButton: {
+    backgroundColor: COLORS.secondary,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  voiceButtonActive: {
+    backgroundColor: COLORS.error,
+  },
+  voiceButtonText: {
+    color: COLORS.text.inverse,
+    fontSize: FONTS.sizes.md,
+    fontWeight: FONTS.weights.semibold,
+  },
+  voiceStatus: {
+    color: COLORS.text.secondary,
+    fontSize: FONTS.sizes.sm,
+    marginBottom: SPACING.sm,
+    textAlign: 'center',
+  },
   sliderGroup: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.md,

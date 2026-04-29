@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 
 from app.dependencies import DB, CurrentUserDep
 from app.models.checkins import (
@@ -36,6 +36,7 @@ async def create_checkin(
 async def save_voice_note(
     current_user: CurrentUserDep,
     db: DB,
+    background_tasks: BackgroundTasks,
     checkin_date: date = Form(...),
     file: UploadFile = File(...),
 ):
@@ -48,9 +49,19 @@ async def save_voice_note(
     if len(file_bytes) > _MAX_VOICE_SIZE_BYTES:
         raise HTTPException(status_code=413, detail="Audio file must be smaller than 25 MB")
 
-    return await checkin_service.save_voice_note(
+    response = await checkin_service.save_voice_note(
         current_user.uid, checkin_date, file_bytes, file.content_type, db
     )
+    background_tasks.add_task(
+        checkin_service.process_transcription_job,
+        current_user.uid,
+        response.transcription_job_id,
+        checkin_date,
+        file_bytes,
+        file.content_type,
+        db,
+    )
+    return response
 
 
 @router.get("/voice/transcription/{job_id}", response_model=TranscriptionStatusResponse)
