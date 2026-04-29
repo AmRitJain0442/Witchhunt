@@ -184,6 +184,31 @@ async def get_adherence_summary(
     )
 
 
+@router.get("/reminders/due")
+async def get_due_reminders(
+    current_user: CurrentUserDep,
+    db: DB,
+    minutes_before: int = 15,
+    minutes_after: int = 240,
+):
+    return {
+        "reminders": await medicine_service.get_due_reminders(
+            current_user.uid,
+            db,
+            minutes_before=minutes_before,
+            minutes_after=minutes_after,
+        )
+    }
+
+
+@router.post("/reminders/send-due")
+async def send_due_reminders(
+    current_user: CurrentUserDep,
+    db: DB,
+):
+    return await medicine_service.send_due_reminders(current_user.uid, db)
+
+
 # ---------------------------------------------------------------------------
 # Medicine CRUD endpoints
 # ---------------------------------------------------------------------------

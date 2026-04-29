@@ -760,6 +760,90 @@ async def record_refill(
     return _build_medicine_response(data, adh_7d, adh_30d)
 
 
+async def get_due_reminders(
+    uid: str,
+    db: AsyncClient,
+    minutes_before: int = 15,
+    minutes_after: int = 240,
+) -> list[dict]:
+    today_schedule = await get_today_schedule(uid, db)
+    now_ist = datetime.now(IST)
+    due: list[dict] = []
+
+    for item in today_schedule.schedule:
+        if item.taken or item.skipped:
+            continue
+        hour, minute = map(int, item.dose_time.split(":"))
+        scheduled_at = datetime(
+            now_ist.year,
+            now_ist.month,
+            now_ist.day,
+            hour,
+            minute,
+            tzinfo=IST,
+        )
+        delta_minutes = (scheduled_at - now_ist).total_seconds() / 60
+        if -minutes_after <= delta_minutes <= minutes_before or item.overdue:
+            due.append({
+                "medicine_id": item.medicine_id,
+                "medicine_name": item.medicine_name,
+                "dose_time": item.dose_time,
+                "dose_amount": item.dose_amount,
+                "dose_unit": item.dose_unit,
+                "overdue": item.overdue,
+                "scheduled_at": scheduled_at.astimezone(timezone.utc).isoformat(),
+                "habit_anchor": "Take it with your usual meal or chai if your doctor allows.",
+            })
+    return due
+
+
+async def send_due_reminders(uid: str, db: AsyncClient) -> dict:
+    due = await get_due_reminders(uid, db)
+    user_doc = await db.collection("users").document(uid).get()
+    if not user_doc.exists:
+        raise NotFoundError("User")
+    user = user_doc.to_dict()
+    fcm_token = user.get("fcm_token")
+    phone = user.get("phone_number")
+    today_str = date.today().isoformat()
+    events_ref = db.collection("users").document(uid).collection("medicine_reminder_events")
+
+    sent: list[dict] = []
+    skipped: list[dict] = []
+    for reminder in due:
+        event_id = f"{today_str}_{reminder['medicine_id']}_{reminder['dose_time'].replace(':', '')}"
+        event_doc = await events_ref.document(event_id).get()
+        if event_doc.exists:
+            skipped.append({**reminder, "reason": "already_sent"})
+            continue
+
+        from app.services.notification_service import send_medicine_due_reminder
+
+        channel = send_medicine_due_reminder(
+            fcm_token=fcm_token,
+            phone=phone,
+            medicine_name=reminder["medicine_name"],
+            dose_time=reminder["dose_time"],
+            habit_anchor=reminder.get("habit_anchor"),
+        )
+        event_data = {
+            **reminder,
+            "event_id": event_id,
+            "channel": channel,
+            "sent_at": datetime.now(timezone.utc),
+        }
+        await events_ref.document(event_id).set(event_data)
+        sent.append(event_data)
+
+    return {
+        "due_count": len(due),
+        "sent_count": len(sent),
+        "skipped_count": len(skipped),
+        "sent": sent,
+        "skipped": skipped,
+    }
+
+
 async def get_adherence_summary(
     uid: str,
     period: str,

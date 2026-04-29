@@ -123,6 +123,25 @@ def send_refill_alert(fcm_token: str | None, phone: str, medicine_name: str, day
         _send_sms(phone, body)
 
 
+def send_medicine_due_reminder(
+    fcm_token: str | None,
+    phone: str | None,
+    medicine_name: str,
+    dose_time: str,
+    habit_anchor: str | None = None,
+) -> str:
+    """Dose reminder. Returns the channel attempted; never raises."""
+    anchor = f" {habit_anchor.strip()}" if habit_anchor else ""
+    body = f"Time for {medicine_name} at {dose_time}.{anchor}"
+    if fcm_token:
+        _send_fcm(fcm_token, title="Medicine Reminder", body=body, data={"type": "medicine_reminder"})
+        return "push"
+    if phone:
+        _send_sms(phone, body)
+        return "sms"
+    return "none"
+
+
 def send_family_invite(phone_number: str, inviter_name: str, invite_id: str) -> None:
     """SMS invite to join Kutumb. Never raises."""
     body = (
