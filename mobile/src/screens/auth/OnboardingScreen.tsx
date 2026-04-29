@@ -49,7 +49,7 @@ export default function OnboardingScreen() {
     setLoading(true);
 
     try {
-      const res = await startOnboarding(stage, text, newHistory);
+      const res = await startOnboarding(stage, text, newHistory, localMemory);
       const assistantMsg: ChatMessage = { role: 'assistant', content: res.reply };
       setMessages((prev) => [...prev, assistantMsg]);
       setConversationHistory([...newHistory, assistantMsg]);

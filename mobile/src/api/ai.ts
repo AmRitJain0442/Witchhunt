@@ -3,6 +3,7 @@ import client from './client';
 import { SessionRequest, SessionResponse } from '../types';
 
 const sessionId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const ONBOARDING_STAGES = ['welcome', 'demographics', 'medical_history', 'medications', 'allergies', 'lifestyle', 'family_goals', 'finalize'];
 
 export const sendMessage = (data: SessionRequest) =>
   client
@@ -37,7 +38,7 @@ export const startOnboarding = (
       onboard_session_id: sessionId(),
       user_id_hash: auth().currentUser?.uid ?? 'mobile-user',
       stage,
-      stage_index: 0,
+      stage_index: Math.max(0, ONBOARDING_STAGES.indexOf(stage)),
       total_stages: 7,
       message,
       partial_memory: partialMemory,
@@ -49,7 +50,11 @@ export const startOnboarding = (
         platform: 'android',
       },
     })
-    .then((r) => r.data);
+    .then((r) => ({
+      ...r.data,
+      reply: r.data.ai_response?.text ?? '',
+      patches: r.data.memory_patches?.operations ?? [],
+    }));
 
 export const compressMemory = (memoryFile: Record<string, unknown>) =>
   client.post('/ai/memory/compress', { memory_file: memoryFile }).then((r) => r.data);

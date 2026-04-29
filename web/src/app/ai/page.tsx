@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { aiApi } from '@/lib/api';
+import { applyMemoryPatches, loadLocalMemory, saveLocalMemory } from '@/lib/local-memory';
 import { cn, severityBg } from '@/lib/utils';
 
 interface Msg  { role: 'user' | 'assistant'; content: string }
@@ -26,9 +27,11 @@ export default function AIPage() {
   const [input,    setInput]     = useState('');
   const [loading,  setLoading]   = useState(false);
   const [triggers, setTriggers]  = useState<Trig[]>([]);
+  const [memory,   setMemory]    = useState<Record<string, unknown>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
   const textRef   = useRef<HTMLTextAreaElement>(null);
 
+  useEffect(() => { setMemory(loadLocalMemory()); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   const send = async (text?: string) => {
@@ -44,11 +47,16 @@ export default function AIPage() {
     setTriggers([]);
 
     try {
-      const res = await aiApi.message({ message: msg, conversation_history: newHistory, memory_file: {} });
+      const res = await aiApi.message({ message: msg, conversation_history: newHistory, memory_file: memory });
       const assistantMsg: Msg = { role: 'assistant', content: res.reply };
       setMessages(p => [...p, assistantMsg]);
       setHistory([...newHistory, assistantMsg]);
       if (res.fired_triggers?.length) setTriggers(res.fired_triggers);
+      if (res.patches?.length) {
+        const nextMemory = applyMemoryPatches(memory, res.patches);
+        setMemory(nextMemory);
+        saveLocalMemory(nextMemory);
+      }
     } catch {
       setMessages(p => [...p, { role: 'assistant', content: 'Connection error. Please try again.' }]);
     } finally {

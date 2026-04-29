@@ -1,30 +1,16 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
-import * as SecureStore from 'expo-secure-store';
-import { login, register } from '../api/auth';
-import { User } from '../types';
-
-interface AuthContextValue {
-  firebaseUser: FirebaseAuthTypes.User | null;
-  appUser: User | null;
-  isLoading: boolean;
-  signInWithEmail: (email: string, password: string) => Promise<void>;
-  signUpWithEmail: (email: string, password: string, name: string) => Promise<void>;
-  signOut: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
 const MEMORY_KEY = 'kutumb_local_memory';
 
-function defaultMemory(): Record<string, unknown> {
+type PatchOperation = { op: string; path: string; value?: unknown };
+type PathSegment = string | { key: string; id: string };
+
+export function defaultMemory(): Record<string, unknown> {
   return {
     _meta: {
       schema_version: '1.0.0',
       patch_sequence: 0,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      storage: 'expo-secure-store',
+      storage: 'browser-local-storage',
     },
     identity: {},
     family_links: [],
@@ -40,8 +26,6 @@ function defaultMemory(): Record<string, unknown> {
     session_memory: { last_10_sessions: [], compressed_history: { version: 1, summary: '' } },
   };
 }
-
-type PathSegment = string | { key: string; id: string };
 
 function parsePath(path: string): PathSegment[] {
   const normalized = path.startsWith('/') ? path.slice(1).replace(/\//g, '.') : path;
@@ -124,96 +108,31 @@ function removeValue(root: Record<string, unknown>, path: string) {
   }
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseAuthTypes.User | null>(null);
-  const [appUser, setAppUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const unsubscribe = auth().onAuthStateChanged(async (fbUser) => {
-      setFirebaseUser(fbUser);
-      if (fbUser) {
-        try {
-          const token = await fbUser.getIdToken();
-          const response = await login(token);
-          setAppUser(response.user);
-        } catch {
-          // User not registered yet — that's OK
-        }
-      } else {
-        setAppUser(null);
-      }
-      setIsLoading(false);
-    });
-    return unsubscribe;
-  }, []);
-
-  const signInWithEmail = async (email: string, password: string) => {
-    const cred = await auth().signInWithEmailAndPassword(email, password);
-    const token = await cred.user.getIdToken();
-    const response = await login(token);
-    setAppUser(response.user);
-  };
-
-  const signUpWithEmail = async (email: string, password: string, name: string) => {
-    const cred = await auth().createUserWithEmailAndPassword(email, password);
-    await cred.user.updateProfile({ displayName: name });
-    const token = await cred.user.getIdToken(true);
-    const response = await register(token, undefined, name);
-    // Patch the name in immediately
-    setAppUser({ ...response.user, name });
-  };
-
-  const signOut = async () => {
-    await auth().signOut();
-    setAppUser(null);
-    setFirebaseUser(null);
-  };
-
-  return (
-    <AuthContext.Provider
-      value={{ firebaseUser, appUser, isLoading, signInWithEmail, signUpWithEmail, signOut }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
-  return ctx;
-}
-
-// ── Local memory helpers (stored on device via SecureStore) ───────────────────
-
-export async function loadLocalMemory(): Promise<Record<string, unknown>> {
+export function loadLocalMemory(): Record<string, unknown> {
+  if (typeof window === 'undefined') return defaultMemory();
   try {
-    const raw = await SecureStore.getItemAsync(MEMORY_KEY);
+    const raw = window.localStorage.getItem(MEMORY_KEY);
     return raw ? { ...defaultMemory(), ...JSON.parse(raw) } : defaultMemory();
   } catch {
     return defaultMemory();
   }
 }
 
-export async function saveLocalMemory(memory: Record<string, unknown>): Promise<void> {
+export function saveLocalMemory(memory: Record<string, unknown>) {
+  if (typeof window === 'undefined') return;
   const next = {
     ...memory,
     _meta: {
       ...((memory._meta as Record<string, unknown>) ?? {}),
       updated_at: new Date().toISOString(),
-      storage: 'expo-secure-store',
+      storage: 'browser-local-storage',
     },
   };
-  await SecureStore.setItemAsync(MEMORY_KEY, JSON.stringify(next));
+  window.localStorage.setItem(MEMORY_KEY, JSON.stringify(next));
 }
 
-export async function applyMemoryPatches(
-  memory: Record<string, unknown>,
-  patches: Array<{ op: string; path: string; value?: unknown }>,
-): Promise<Record<string, unknown>> {
+export function applyMemoryPatches(memory: Record<string, unknown>, patches: PatchOperation[]) {
   const result = cloneMemory({ ...defaultMemory(), ...memory });
-
   for (const patch of patches) {
     switch (patch.op) {
       case 'update':
@@ -246,13 +165,11 @@ export async function applyMemoryPatches(
       }
     }
   }
-
   const meta = (result._meta as Record<string, unknown>) ?? {};
   result._meta = {
     ...meta,
     patch_sequence: Number(meta.patch_sequence ?? 0) + patches.length,
     updated_at: new Date().toISOString(),
   };
-
   return result;
 }
