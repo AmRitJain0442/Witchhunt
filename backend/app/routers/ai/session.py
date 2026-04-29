@@ -29,6 +29,17 @@ settings = get_settings()
 
 _client = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
+_CRISIS_TERMS = [
+    "kill myself",
+    "suicide",
+    "end my life",
+    "i want to die",
+    "can't go on",
+    "मरना चाहता",
+    "खुदकुशी",
+    "आत्महत्या",
+]
+
 SYSTEM_PROMPT = """You are Kutumb, a trusted AI health companion for Indian families.
 You receive the user's complete health memory as a JSON object (HealthContext) and their message.
 
@@ -97,6 +108,11 @@ def _build_user_prompt(req: SessionRequest) -> str:
         f"{history_text}\n"
         f"Patient's message: {req.message}"
     )
+
+
+def _detect_crisis(message: str) -> bool:
+    text = message.lower()
+    return any(term in text for term in _CRISIS_TERMS)
 
 
 def _evaluate_triggers(memory_file: dict, patches: dict) -> list[FiredTrigger]:
@@ -168,6 +184,53 @@ def _evaluate_triggers(memory_file: dict, patches: dict) -> list[FiredTrigger]:
 @router.post("", response_model=SessionResponse)
 async def run_session(req: SessionRequest, current_user: CurrentUserDep):
     start_ms = int(time.time() * 1000)
+    if _detect_crisis(req.message):
+        elapsed_ms = int(time.time() * 1000) - start_ms
+        alert = FiredTrigger(
+            trigger_id="mental_health_crisis",
+            trigger_name="Mental health crisis language",
+            fired=True,
+            action="crisis_support",
+            severity="critical",
+            message=(
+                "This sounds urgent. If you may hurt yourself, call emergency services now. "
+                "In the US or Canada call or text 988. In India, contact iCall at +91 9152987821. "
+                "If possible, stay with another person while you get help."
+            ),
+            sos_active=False,
+        )
+        return SessionResponse(
+            session_id=req.session_id,
+            ai_response=AIResponseContent(
+                text=(
+                    "I'm really sorry you're feeling this way. I can't provide crisis care, but you deserve immediate support. "
+                    "If you might act on these thoughts, call local emergency services now. In the US or Canada call or text 988; "
+                    "in India, contact iCall at +91 9152987821. Please move near someone you trust and tell them directly that you need help."
+                ),
+                follow_up_questions=[],
+                suggested_actions=[
+                    "Call local emergency services if you are in immediate danger.",
+                    "Call or text 988 in the US or Canada, or contact iCall at +91 9152987821 in India.",
+                    "Stay with a trusted person until help is available.",
+                ],
+                urgency_level="emergency",
+            ),
+            memory_patches={
+                "patch_sequence": req.memory_file.get("_meta", {}).get("patch_sequence", 0),
+                "operations": [],
+                "trigger_evaluations": [{
+                    "trigger_id": alert.trigger_id,
+                    "fired": True,
+                    "action": alert.action,
+                    "message": alert.message,
+                }],
+                "new_triggers": [],
+                "session_id": req.session_id,
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+            },
+            triggered_alerts=[alert],
+            processing_time_ms=elapsed_ms,
+        )
 
     try:
         response = await _client.messages.create(
