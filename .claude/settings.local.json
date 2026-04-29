@@ -23,7 +23,9 @@
       "Bash(done)",
       "Bash(ls:*)",
       "Bash(node -e \"console.log\\(require\\(''./node_modules/tailwindcss/package.json''\\).version\\)\")",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(python:*)",
+      "Bash(pip install:*)"
     ]
   }
 }

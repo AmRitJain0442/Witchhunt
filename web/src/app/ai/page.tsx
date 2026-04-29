@@ -1,16 +1,17 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { AlertTriangle, Bot, Loader2, SendHorizontal, Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { aiApi } from '@/lib/api';
 import { applyMemoryPatches, loadLocalMemory, saveLocalMemory } from '@/lib/local-memory';
 import { cn, severityBg } from '@/lib/utils';
 
-interface Msg  { role: 'user' | 'assistant'; content: string }
+interface Msg { role: 'user' | 'assistant'; content: string }
 interface Trig { trigger_name: string; message: string; severity: string }
 
 const WELCOME: Msg = {
   role: 'assistant',
-  content: "Namaste. I'm your Kutumb health companion — I have your full medical profile in memory. Ask me anything about your health, medicines, diet, or symptoms.",
+  content: "Namaste. I'm your Kutumb health companion. I can reason across medicines, check-ins, reports, family context, and your local health memory.",
 };
 
 const PROMPTS = [
@@ -22,26 +23,31 @@ const PROMPTS = [
 ];
 
 export default function AIPage() {
-  const [messages, setMessages]  = useState<Msg[]>([WELCOME]);
-  const [history,  setHistory]   = useState<Msg[]>([]);
-  const [input,    setInput]     = useState('');
-  const [loading,  setLoading]   = useState(false);
-  const [triggers, setTriggers]  = useState<Trig[]>([]);
-  const [memory,   setMemory]    = useState<Record<string, unknown>>({});
+  const [messages, setMessages] = useState<Msg[]>([WELCOME]);
+  const [history, setHistory] = useState<Msg[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [triggers, setTriggers] = useState<Trig[]>([]);
+  const [memory, setMemory] = useState<Record<string, unknown>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
-  const textRef   = useRef<HTMLTextAreaElement>(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => { setMemory(loadLocalMemory()); }, []);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    setMemory(loadLocalMemory());
+  }, []);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const send = async (text?: string) => {
     const msg = (text ?? input).trim();
     if (!msg || loading) return;
     setInput('');
 
-    const userMsg: Msg       = { role: 'user', content: msg };
-    const newHistory         = [...history, userMsg];
-    setMessages(p => [...p, userMsg]);
+    const userMsg: Msg = { role: 'user', content: msg };
+    const newHistory = [...history, userMsg];
+    setMessages((p) => [...p, userMsg]);
     setHistory(newHistory);
     setLoading(true);
     setTriggers([]);
@@ -49,7 +55,7 @@ export default function AIPage() {
     try {
       const res = await aiApi.message({ message: msg, conversation_history: newHistory, memory_file: memory });
       const assistantMsg: Msg = { role: 'assistant', content: res.reply };
-      setMessages(p => [...p, assistantMsg]);
+      setMessages((p) => [...p, assistantMsg]);
       setHistory([...newHistory, assistantMsg]);
       if (res.fired_triggers?.length) setTriggers(res.fired_triggers);
       if (res.patches?.length) {
@@ -58,108 +64,130 @@ export default function AIPage() {
         saveLocalMemory(nextMemory);
       }
     } catch {
-      setMessages(p => [...p, { role: 'assistant', content: 'Connection error. Please try again.' }]);
+      setMessages((p) => [...p, { role: 'assistant', content: 'Connection error. Please try again.' }]);
     } finally {
       setLoading(false);
     }
   };
 
   const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
   };
 
   return (
-    <div className="flex flex-col h-screen">
-      {/* Header */}
-      <div className="px-8 h-14 flex items-center border-b border-border bg-surface shrink-0">
-        <div>
-          <span className="text-[13px] font-medium text-tx-1">Kutumb AI</span>
-          <span className="ml-3 text-[11px] text-tx-3">Powered by Claude · Health-aware</span>
+    <div className="flex h-[calc(100svh-3.5rem)] flex-col md:h-screen">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent-muted text-accent">
+            <Bot size={21} strokeWidth={1.8} />
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-tx-1">Kutumb AI</div>
+            <div className="text-xs text-tx-3">Health-aware chat with local memory context</div>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Triggers */}
       {triggers.length > 0 && (
-        <div className="px-6 pt-3 space-y-2 shrink-0">
+        <div className="shrink-0 space-y-2 border-b border-border bg-bg px-4 py-3 sm:px-6 lg:px-8">
           {triggers.map((t, i) => (
-            <div key={i} className={cn('rounded-lg border px-4 py-2.5 text-[13px]', severityBg(t.severity))}>
-              <strong className="font-medium">{t.trigger_name}</strong>
-              <span className="mx-1.5 opacity-40">·</span>
-              {t.message}
+            <div key={i} className={cn('rounded-xl border px-4 py-3 text-sm', severityBg(t.severity))}>
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle size={17} strokeWidth={1.9} className="mt-0.5 shrink-0" />
+                <div>
+                  <strong className="font-semibold">{t.trigger_name}</strong>
+                  <span className="mx-1.5 opacity-50">:</span>
+                  {t.message}
+                </div>
+              </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
-        {messages.map((m, i) => (
-          <div key={i} className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
-            {m.role === 'assistant' && (
-              <div className="w-5 h-5 rounded-full bg-accent-muted text-accent text-[9px] flex items-center justify-center shrink-0 mt-0.5 mr-2.5 font-mono">
-                K
-              </div>
-            )}
-            <div className={cn(
-              'max-w-[70%] rounded-2xl px-4 py-3 text-[14px] leading-relaxed',
-              m.role === 'user'
-                ? 'bg-accent text-accent-text rounded-br-sm'
-                : 'bg-surface border border-border text-tx-1 rounded-bl-sm',
-            )}>
-              <div className="whitespace-pre-wrap">{m.content}</div>
-            </div>
-          </div>
-        ))}
-
-        {loading && (
-          <div className="flex justify-start items-start gap-2.5">
-            <div className="w-5 h-5 rounded-full bg-accent-muted text-accent text-[9px] flex items-center justify-center shrink-0 mt-0.5 font-mono">K</div>
-            <div className="bg-surface border border-border rounded-2xl rounded-bl-sm px-4 py-3.5">
-              <div className="flex gap-1.5 items-center">
-                {[0,100,200].map(d => (
-                  <div key={d} className="w-1.5 h-1.5 bg-tx-3 rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
-                ))}
+      <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-3xl space-y-4">
+          {messages.map((m, i) => (
+            <div key={i} className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
+              {m.role === 'assistant' && (
+                <div className="mr-2.5 mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-accent-muted text-accent">
+                  <Bot size={17} strokeWidth={1.8} />
+                </div>
+              )}
+              <div
+                className={cn(
+                  'max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm sm:max-w-[72%]',
+                  m.role === 'user'
+                    ? 'rounded-br-md bg-accent text-accent-text'
+                    : 'rounded-bl-md border border-border bg-surface text-tx-1',
+                )}
+              >
+                <div className="whitespace-pre-wrap">{m.content}</div>
               </div>
             </div>
-          </div>
-        )}
+          ))}
 
-        {/* Suggested prompts */}
-        {messages.length === 1 && !loading && (
-          <div className="ml-7 space-y-1.5">
-            {PROMPTS.map((p, i) => (
-              <button key={i} onClick={() => send(p)}
-                className="block w-full text-left text-[13px] border border-border bg-surface hover:border-border-strong hover:bg-surface-raised text-tx-2 hover:text-tx-1 rounded-xl px-4 py-2.5 transition-all">
-                {p}
-              </button>
-            ))}
-          </div>
-        )}
+          {loading && (
+            <div className="flex justify-start gap-2.5">
+              <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-accent-muted text-accent">
+                <Bot size={17} strokeWidth={1.8} />
+              </div>
+              <div className="rounded-2xl rounded-bl-md border border-border bg-surface px-4 py-3.5">
+                <div className="flex items-center gap-2 text-sm text-tx-3">
+                  <Loader2 size={15} className="animate-spin" />
+                  Thinking
+                </div>
+              </div>
+            </div>
+          )}
 
-        <div ref={bottomRef} />
+          {messages.length === 1 && !loading && (
+            <div className="ml-0 grid gap-2 sm:ml-10">
+              {PROMPTS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => send(p)}
+                  className="focus-ring surface-panel card-lift flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm text-tx-2 hover:text-tx-1"
+                >
+                  <Sparkles size={16} strokeWidth={1.8} className="shrink-0 text-accent" />
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div ref={bottomRef} />
+        </div>
       </div>
 
-      {/* Input */}
-      <div className="px-6 py-4 border-t border-border bg-surface shrink-0">
-        <div className="flex gap-3 items-end">
-          <textarea
-            ref={textRef}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKey}
-            placeholder="Ask about your health…"
-            rows={1}
-            className="flex-1 resize-none bg-bg border border-border focus:border-border-strong rounded-xl px-4 py-2.5 text-[14px] text-tx-1 placeholder:text-tx-3 outline-none transition-colors max-h-32"
-          />
-          <button
-            onClick={() => send()}
-            disabled={!input.trim() || loading}
-            className="w-9 h-9 rounded-xl bg-accent hover:bg-accent-hover disabled:opacity-30 text-accent-text flex items-center justify-center transition-colors shrink-0 text-[13px]"
-          >
-            ↑
-          </button>
+      <div className="shrink-0 border-t border-border bg-surface px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-3xl">
+          <div className="flex gap-3">
+            <textarea
+              ref={textRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKey}
+              placeholder="Ask about symptoms, medicines, diet, or trends..."
+              rows={1}
+              className="focus-ring max-h-32 min-h-11 flex-1 resize-none rounded-2xl border border-border bg-bg px-4 py-3 text-sm text-tx-1 outline-none placeholder:text-tx-3"
+            />
+            <button
+              type="button"
+              onClick={() => send()}
+              disabled={!input.trim() || loading}
+              className="focus-ring flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accent text-accent-text transition-colors hover:bg-accent-hover disabled:opacity-35"
+              aria-label="Send message"
+            >
+              <SendHorizontal size={18} strokeWidth={1.9} />
+            </button>
+          </div>
+          <div className="mt-2 text-center text-[11px] text-tx-3">Enter sends. Shift Enter adds a new line.</div>
         </div>
-        <div className="text-[11px] text-tx-3 mt-1.5 text-center">Enter to send · Shift+Enter for newline</div>
       </div>
     </div>
   );

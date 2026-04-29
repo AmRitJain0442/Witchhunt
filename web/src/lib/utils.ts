@@ -23,10 +23,10 @@ export function scoreBarColor(score: number) {
 }
 
 export function trendIcon(trend: string) {
-  if (trend === 'improving') return '↑';
-  if (trend === 'declining') return '↓';
-  if (trend === 'stable')    return '→';
-  return '—';
+  if (trend === 'improving') return 'up';
+  if (trend === 'declining') return 'down';
+  if (trend === 'stable') return 'flat';
+  return '-';
 }
 
 export function trendColor(trend: string) {
@@ -37,15 +37,15 @@ export function trendColor(trend: string) {
 
 export function severityBg(s: string) {
   const m: Record<string, string> = {
-    critical: 'bg-red/8 border-red/20 text-red',
-    warning:  'bg-amber/8 border-amber/20 text-amber',
-    info:     'bg-accent-muted border-accent/20 text-accent',
+    critical: 'bg-red/[0.08] border-red/20 text-red',
+    warning: 'bg-amber/[0.08] border-amber/20 text-amber',
+    info: 'bg-accent-muted border-accent/20 text-accent',
   };
   return m[s] ?? m.info;
 }
 
 export function relativeDate(iso: string) {
-  const d    = new Date(iso);
+  const d = new Date(iso);
   const diff = Math.floor((Date.now() - d.getTime()) / 86400000);
   if (diff === 0) return 'Today';
   if (diff === 1) return 'Yesterday';
