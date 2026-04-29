@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const cred = await createUserWithEmailAndPassword(auth, email, pw);
     await updateProfile(cred.user, { displayName: name });
     const token = await cred.user.getIdToken(true);
-    const res = await authApi.register(token);
+    const res = await authApi.register(token, name);
     setAppUser({ ...res.user, name });
   };
 

@@ -51,14 +51,16 @@ export default function CheckinPage() {
 
   useEffect(() => {
     if (!existing) return;
-    setMood(existing.mood);
-    setEnergy(existing.energy_level);
-    setPain(existing.pain_level);
-    setStress(existing.stress_level);
-    setSleep(existing.sleep_hours ? Math.round(existing.sleep_hours) : undefined);
-    setHydration(existing.hydration_glasses);
-    setSymptoms(existing.symptoms ?? []);
-    setNotes(existing.notes ?? '');
+    queueMicrotask(() => {
+      setMood(existing.mood);
+      setEnergy(existing.energy_level);
+      setPain(existing.pain_level);
+      setStress(existing.stress_level);
+      setSleep(existing.sleep_hours ? Math.round(existing.sleep_hours) : undefined);
+      setHydration(existing.hydration_glasses);
+      setSymptoms(existing.symptoms ?? []);
+      setNotes(existing.notes ?? '');
+    });
   }, [existing]);
 
   const mutation = useMutation({

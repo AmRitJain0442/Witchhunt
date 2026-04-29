@@ -96,7 +96,12 @@ async def list_checkins(
     )
 
 
-# /streak MUST be declared before /{checkin_id} to avoid path conflict
+# Static routes MUST be declared before /{checkin_id} to avoid path conflict
+@router.get("/today", response_model=CheckinResponse | None)
+async def get_todays_checkin(current_user: CurrentUserDep, db: DB):
+    return await checkin_service.get_todays_checkin(current_user.uid, db)
+
+
 @router.get("/streak", response_model=StreakResponse)
 async def get_streak(current_user: CurrentUserDep, db: DB):
     return await checkin_service.get_streak(current_user.uid, db)

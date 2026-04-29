@@ -36,6 +36,8 @@ def _doc_to_family_member(data: dict) -> FamilyMember:
 
 async def _find_uid_by_phone(phone_number: str, db: AsyncClient) -> str | None:
     """Return uid of a registered user with the given phone_number, or None."""
+    if not phone_number:
+        return None
     query = db.collection("users").where("phone_number", "==", phone_number).limit(1)
     docs = [doc async for doc in query.stream()]
     if docs:
@@ -58,10 +60,11 @@ async def add_family_member(
     family_ref = db.collection("users").document(uid).collection("family_members")
 
     # Prevent duplicates by phone_number within this user's family
-    existing_query = family_ref.where("phone_number", "==", req.phone_number).limit(1)
-    existing_docs = [doc async for doc in existing_query.stream()]
-    if existing_docs:
-        raise AlreadyExistsError("Family member with this phone number")
+    if req.phone_number:
+        existing_query = family_ref.where("phone_number", "==", req.phone_number).limit(1)
+        existing_docs = [doc async for doc in existing_query.stream()]
+        if existing_docs:
+            raise AlreadyExistsError("Family member with this phone number")
 
     now = datetime.now(timezone.utc)
     member_id = str(uuid4())
@@ -94,6 +97,16 @@ async def add_family_member(
         "expires_at": now + timedelta(days=7),
     }
     await db.collection("family_invites").document(invite_id).set(invite_data)
+
+    if req.phone_number:
+        try:
+            from app.services.notification_service import send_family_invite
+
+            inviter_doc = await db.collection("users").document(uid).get()
+            inviter_name = inviter_doc.to_dict().get("display_name", "A family member") if inviter_doc.exists else "A family member"
+            send_family_invite(req.phone_number, inviter_name, invite_id)
+        except Exception:
+            pass
 
     # If target_uid found, create a mirror/pending record in their family_members with
     # only RECEIVE_SOS so they can see the connection before accepting

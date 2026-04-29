@@ -109,14 +109,14 @@ export default function DashboardPage() {
       )}
 
       {/* Medicines today */}
-      {meds?.schedules?.length > 0 && (
+      {(meds?.schedules?.length ?? 0) > 0 && (
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <div className="text-[11px] uppercase tracking-widest text-tx-3">Today's medicines</div>
+            <div className="text-[11px] uppercase tracking-widest text-tx-3">Today&apos;s medicines</div>
             <Link href="/medicines" className="text-[11px] text-accent hover:underline">View all</Link>
           </div>
           <div className="bg-surface border border-border rounded-xl overflow-hidden">
-            {meds.schedules.slice(0, 6).map((s: { medicine_name: string; dosage: string; dose_time: string; status: string }, i: number) => (
+            {meds?.schedules?.slice(0, 6).map((s: { medicine_name: string; dosage: string; dose_time: string; status: string }, i: number) => (
               <div key={i} className={cn('flex items-center px-5 py-3.5 border-b border-border last:border-0', s.status === 'overdue' && 'bg-red/[0.03]')}>
                 <span className={cn('w-4 text-[13px] font-mono shrink-0', STATUS_COLOR[s.status] ?? '')}>{STATUS_ICON[s.status]}</span>
                 <span className="flex-1 text-[13px] text-tx-1 ml-3">{s.medicine_name}</span>
@@ -125,7 +125,7 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-          {meds.adherence_pct !== undefined && (
+          {meds?.adherence_pct !== undefined && (
             <div className="mt-2 flex items-center gap-3">
               <div className="flex-1 h-px bg-border overflow-hidden">
                 <div className="h-full bg-accent transition-all" style={{ width: `${meds.adherence_pct}%` }} />

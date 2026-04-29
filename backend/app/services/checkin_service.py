@@ -159,6 +159,20 @@ async def get_checkin(
     return _doc_to_checkin_response(doc.to_dict())
 
 
+async def get_todays_checkin(uid: str, db: AsyncClient) -> CheckinResponse | None:
+    doc_id = date.today().isoformat()
+    doc = await (
+        db.collection("users")
+        .document(uid)
+        .collection("checkins")
+        .document(doc_id)
+        .get()
+    )
+    if not doc.exists:
+        return None
+    return _doc_to_checkin_response(doc.to_dict())
+
+
 async def update_checkin(
     uid: str,
     checkin_id: str,

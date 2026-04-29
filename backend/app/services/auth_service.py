@@ -18,7 +18,7 @@ async def register_user(
     db: AsyncClient,
 ) -> AuthRegisterResponse:
     # Verify Firebase token and extract uid
-    current_user = verify_firebase_token(req.firebase_token)
+    current_user = verify_firebase_token(req.firebase_token or "")
     uid = current_user.uid
 
     # Check if user doc already exists
@@ -28,11 +28,20 @@ async def register_user(
         raise AlreadyExistsError("User")
 
     now = datetime.now(timezone.utc)
+    firebase_user = auth.get_user(uid)
+    display_name = (
+        req.display_name
+        or firebase_user.display_name
+        or current_user.email
+        or current_user.phone_number
+        or "Kutumb User"
+    )
+    phone_number = req.phone_number or current_user.phone_number or ""
     user_data = {
         "uid": uid,
-        "display_name": req.display_name,
-        "phone_number": req.phone_number,
-        "date_of_birth": req.date_of_birth.isoformat(),
+        "display_name": display_name,
+        "phone_number": phone_number,
+        "date_of_birth": req.date_of_birth.isoformat() if req.date_of_birth else None,
         "gender": req.gender,
         "language_preference": req.language_preference,
         "fcm_token": req.fcm_token,
@@ -50,8 +59,8 @@ async def register_user(
 
     return AuthRegisterResponse(
         uid=uid,
-        display_name=req.display_name,
-        phone_number=req.phone_number,
+        display_name=display_name,
+        phone_number=phone_number,
         created_at=now,
         is_profile_complete=False,
     )
@@ -61,7 +70,7 @@ async def login_user(
     req: AuthLoginRequest,
     db: AsyncClient,
 ) -> AuthLoginResponse:
-    current_user = verify_firebase_token(req.firebase_token)
+    current_user = verify_firebase_token(req.firebase_token or "")
     uid = current_user.uid
 
     user_ref = db.collection("users").document(uid)

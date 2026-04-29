@@ -18,7 +18,7 @@ class FamilyMember(BaseModel):
 
 
 class AddFamilyMemberRequest(BaseModel):
-    phone_number: str
+    phone_number: str = ""
     display_name: str
     relationship: str
     permissions: list[FamilyPermission]

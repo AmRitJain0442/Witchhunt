@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const cred = await auth().createUserWithEmailAndPassword(email, password);
     await cred.user.updateProfile({ displayName: name });
     const token = await cred.user.getIdToken(true);
-    const response = await register(token);
+    const response = await register(token, undefined, name);
     // Patch the name in immediately
     setAppUser({ ...response.user, name });
   };
