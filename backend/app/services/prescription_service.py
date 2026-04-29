@@ -1,3 +1,5 @@
+import logging
+import re
 from datetime import date, datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -13,6 +15,17 @@ from app.models.prescriptions import (
     PrescriptionOCRStatusResponse,
     PrescriptionResponse,
 )
+
+logger = logging.getLogger(__name__)
+
+_FREQUENCY_PATTERNS: list[tuple[str, str]] = [
+    (r"\b(once daily|od|1-0-0|daily)\b", "once_daily"),
+    (r"\b(twice daily|bd|bid|1-0-1|1-1-0)\b", "twice_daily"),
+    (r"\b(thrice daily|tds|tid|1-1-1)\b", "thrice_daily"),
+    (r"\b(night|hs|bedtime)\b", "night"),
+    (r"\b(morning|empty stomach)\b", "morning"),
+    (r"\b(as needed|sos|prn)\b", "as_needed"),
+]
 
 
 def _is_prescription_valid(prescribed_date: date) -> bool:
@@ -314,3 +327,111 @@ async def get_ocr_status(
         medicines_found=data.get("medicines_found", 0),
         error_message=data.get("error_message"),
     )
+
+
+async def _extract_text_with_google_vision(file_bytes: bytes, content_type: str) -> str:
+    if content_type == "application/pdf":
+        raise ValueError("PDF OCR requires an async Cloud Vision GCS workflow; upload an image for automatic OCR.")
+
+    try:
+        from google.cloud import vision
+
+        client = vision.ImageAnnotatorClient()
+        image = vision.Image(content=file_bytes)
+        response = client.document_text_detection(image=image)
+        if response.error.message:
+            raise ValueError(response.error.message)
+        return response.full_text_annotation.text or ""
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Prescription OCR failed: %s", exc)
+        raise
+
+
+def _detect_frequency(line: str) -> str:
+    lower = line.lower()
+    for pattern, frequency in _FREQUENCY_PATTERNS:
+        if re.search(pattern, lower):
+            return frequency
+    return "as_directed"
+
+
+def _parse_prescription_text(text: str) -> list[dict]:
+    medicines: list[dict] = []
+    seen: set[str] = set()
+    for raw_line in text.splitlines():
+        line = " ".join(raw_line.strip().split())
+        if len(line) < 4:
+            continue
+        dose_match = re.search(r"(\d+(?:\.\d+)?\s?(?:mg|mcg|g|ml|iu|tablet|tab|capsule|cap|drops?))", line, re.I)
+        if not dose_match:
+            continue
+        prefix = line[:dose_match.start()].strip(" :-#0123456789.")
+        name = re.sub(r"\b(tab|tablet|cap|capsule|syr|syrup|inj|injection)\b", "", prefix, flags=re.I).strip()
+        if not name:
+            name = line.split()[0]
+        normalized_key = f"{name.lower()}:{dose_match.group(1).lower()}"
+        if normalized_key in seen:
+            continue
+        seen.add(normalized_key)
+        medicines.append({
+            "name": name[:80],
+            "generic_name": None,
+            "dosage": dose_match.group(1),
+            "frequency": _detect_frequency(line),
+            "duration": None,
+            "instructions": line,
+            "matched_to_medicine_id": None,
+        })
+    return medicines
+
+
+async def process_prescription_ocr(
+    uid: str,
+    prescription_id: str,
+    job_id: str,
+    file_bytes: bytes,
+    content_type: str,
+    db: AsyncClient,
+) -> None:
+    job_ref = db.collection("users").document(uid).collection("ocr_jobs").document(job_id)
+    prescription_ref = (
+        db.collection("users")
+        .document(uid)
+        .collection("prescriptions")
+        .document(prescription_id)
+    )
+
+    await job_ref.update({"status": "processing", "progress_pct": 20, "updated_at": datetime.now(timezone.utc)})
+    await prescription_ref.update({"status": PrescriptionStatus.PROCESSING.value})
+
+    try:
+        raw_text = await _extract_text_with_google_vision(file_bytes, content_type)
+        extracted = _parse_prescription_text(raw_text)
+        now = datetime.now(timezone.utc)
+        await prescription_ref.update({
+            "status": PrescriptionStatus.PARSED.value,
+            "extracted_medicines": extracted,
+            "ocr_confidence_score": 0.75 if extracted else 0.4,
+            "raw_ocr_text": raw_text,
+            "parsed_at": now,
+        })
+        await job_ref.update({
+            "status": "completed",
+            "progress_pct": 100,
+            "medicines_found": len(extracted),
+            "error_message": None,
+            "updated_at": now,
+        })
+    except Exception as exc:  # noqa: BLE001
+        message = str(exc)[:500]
+        await prescription_ref.update({
+            "status": PrescriptionStatus.FAILED.value,
+            "raw_ocr_text": None,
+            "parsed_at": datetime.now(timezone.utc),
+        })
+        await job_ref.update({
+            "status": "failed",
+            "progress_pct": 0,
+            "error_message": message,
+            "updated_at": datetime.now(timezone.utc),
+        })

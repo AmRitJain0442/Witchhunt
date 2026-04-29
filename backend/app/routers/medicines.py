@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 
 from app.dependencies import DB, CurrentUserDep
 from app.models.common import MessageResponse
@@ -45,6 +45,7 @@ _MAX_PRESCRIPTION_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB
 async def upload_prescription(
     current_user: CurrentUserDep,
     db: DB,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     prescribed_date: date = Form(...),
     doctor_name: str | None = Form(None),
@@ -60,7 +61,7 @@ async def upload_prescription(
     if len(file_bytes) > _MAX_PRESCRIPTION_SIZE_BYTES:
         raise HTTPException(status_code=413, detail="Prescription file must be smaller than 20 MB")
 
-    return await prescription_service.upload_prescription(
+    response = await prescription_service.upload_prescription(
         uid=current_user.uid,
         file_bytes=file_bytes,
         content_type=file.content_type,
@@ -70,6 +71,17 @@ async def upload_prescription(
         notes=notes,
         db=db,
     )
+    if response.ocr_job_id:
+        background_tasks.add_task(
+            prescription_service.process_prescription_ocr,
+            current_user.uid,
+            response.prescription_id,
+            response.ocr_job_id,
+            file_bytes,
+            file.content_type,
+            db,
+        )
+    return response
 
 
 @router.get("/prescriptions/ocr-status/{job_id}", response_model=PrescriptionOCRStatusResponse)

@@ -1,3 +1,5 @@
+import logging
+import re
 from datetime import date, datetime, timezone
 from uuid import uuid4
 
@@ -16,6 +18,8 @@ from app.models.lab_reports import (
     OCRStatusResponse,
 )
 
+logger = logging.getLogger(__name__)
+
 NORMAL_RANGES: dict[str, dict] = {
     "Hemoglobin": {"low": 12.0, "high": 17.5, "unit": "g/dL"},
     "Glucose": {"low": 70, "high": 99, "unit": "mg/dL"},
@@ -27,6 +31,19 @@ NORMAL_RANGES: dict[str, dict] = {
     "Triglycerides": {"low": 0, "high": 150, "unit": "mg/dL"},
     "Platelets": {"low": 150000, "high": 400000, "unit": "/μL"},
     "WBC": {"low": 4000, "high": 11000, "unit": "/μL"},
+}
+
+_BIOMARKER_ALIASES: dict[str, list[str]] = {
+    "Hemoglobin": ["hemoglobin", "haemoglobin", "hb"],
+    "Glucose": ["glucose", "blood sugar", "random glucose", "fasting glucose"],
+    "HbA1c": ["hba1c", "hb a1c", "glycated"],
+    "Creatinine": ["creatinine"],
+    "TSH": ["tsh", "thyroid stimulating"],
+    "LDL": ["ldl"],
+    "HDL": ["hdl"],
+    "Triglycerides": ["triglycerides", "tg"],
+    "Platelets": ["platelet", "platelets"],
+    "WBC": ["wbc", "white blood"],
 }
 
 # Biomarkers where a high value is considered bad (used for trend direction)
@@ -275,6 +292,109 @@ async def get_ocr_status(uid: str, report_id: str, db: AsyncClient) -> OCRStatus
         flagged_count=len(flagged),
         error_message=data.get("ocr_error_message"),
     )
+
+
+async def _extract_text_with_google_vision(file_bytes: bytes, content_type: str) -> str:
+    if content_type == "application/pdf":
+        raise ValueError("PDF OCR requires an async Cloud Vision GCS workflow; upload an image for automatic OCR.")
+    try:
+        from google.cloud import vision
+
+        client = vision.ImageAnnotatorClient()
+        image = vision.Image(content=file_bytes)
+        response = client.document_text_detection(image=image)
+        if response.error.message:
+            raise ValueError(response.error.message)
+        return response.full_text_annotation.text or ""
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Lab report OCR failed: %s", exc)
+        raise
+
+
+def _parse_reference_range(line: str) -> tuple[float | None, float | None]:
+    range_match = re.search(r"(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)", line)
+    if not range_match:
+        return None, None
+    return float(range_match.group(1)), float(range_match.group(2))
+
+
+def _parse_lab_text(text: str) -> list[dict]:
+    biomarkers: list[dict] = []
+    seen: set[str] = set()
+    lines = [" ".join(line.strip().split()) for line in text.splitlines() if line.strip()]
+    for line in lines:
+        lower = line.lower()
+        for name, aliases in _BIOMARKER_ALIASES.items():
+            if name in seen:
+                continue
+            if not any(alias in lower for alias in aliases):
+                continue
+            numbers = re.findall(r"(?<!\d)(\d+(?:\.\d+)?)(?!\d)", line)
+            if not numbers:
+                continue
+            value = float(numbers[0])
+            ref_low, ref_high = _parse_reference_range(line)
+            normal = NORMAL_RANGES.get(name, {})
+            unit = normal.get("unit", "")
+            status, flag = _evaluate_biomarker_status(name, value, ref_low, ref_high)
+            biomarkers.append({
+                "name": name,
+                "value": value,
+                "unit": unit,
+                "reference_range_low": ref_low,
+                "reference_range_high": ref_high,
+                "status": status,
+                "flag": flag,
+            })
+            seen.add(name)
+    return biomarkers
+
+
+async def process_lab_report_ocr(
+    uid: str,
+    report_id: str,
+    job_id: str,
+    file_bytes: bytes,
+    content_type: str,
+    db: AsyncClient,
+) -> None:
+    report_ref = db.collection("users").document(uid).collection("lab_reports").document(report_id)
+    job_ref = db.collection("users").document(uid).collection("ocr_jobs").document(job_id)
+
+    await report_ref.update({"status": LabReportStatus.PROCESSING.value})
+    await job_ref.update({"status": "processing", "updated_at": datetime.now(timezone.utc)})
+
+    try:
+        raw_text = await _extract_text_with_google_vision(file_bytes, content_type)
+        biomarkers = _parse_lab_text(raw_text)
+        flagged = [b["name"] for b in biomarkers if b.get("flag")]
+        now = datetime.now(timezone.utc)
+        await report_ref.update({
+            "status": LabReportStatus.PARSED.value,
+            "biomarkers": biomarkers,
+            "ocr_confidence_score": 0.75 if biomarkers else 0.4,
+            "raw_ocr_text": raw_text,
+            "flagged_biomarkers": flagged,
+            "parsed_at": now,
+        })
+        await job_ref.update({
+            "status": "completed",
+            "biomarkers_found": len(biomarkers),
+            "flagged_count": len(flagged),
+            "updated_at": now,
+        })
+    except Exception as exc:  # noqa: BLE001
+        message = str(exc)[:500]
+        await report_ref.update({
+            "status": LabReportStatus.FAILED.value,
+            "ocr_error_message": message,
+            "parsed_at": datetime.now(timezone.utc),
+        })
+        await job_ref.update({
+            "status": "failed",
+            "error_message": message,
+            "updated_at": datetime.now(timezone.utc),
+        })
 
 
 async def delete_report(uid: str, report_id: str, db: AsyncClient) -> None:

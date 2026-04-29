@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile
 
 from app.dependencies import DB, CurrentUserDep
 from app.models.common import MessageResponse
@@ -29,6 +29,7 @@ _MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB
 async def upload_report(
     current_user: CurrentUserDep,
     db: DB,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     report_date: date = Form(...),
     report_type: str = Form(...),
@@ -49,7 +50,7 @@ async def upload_report(
             detail="File must be smaller than 20 MB",
         )
 
-    return await lab_report_service.upload_report(
+    response = await lab_report_service.upload_report(
         uid=current_user.uid,
         file_bytes=file_bytes,
         content_type=file.content_type,
@@ -60,6 +61,17 @@ async def upload_report(
         notes=notes,
         db=db,
     )
+    if response.ocr_job_id:
+        background_tasks.add_task(
+            lab_report_service.process_lab_report_ocr,
+            current_user.uid,
+            response.report_id,
+            response.ocr_job_id,
+            file_bytes,
+            file.content_type,
+            db,
+        )
+    return response
 
 
 @router.get("/", response_model=LabReportListResponse)
