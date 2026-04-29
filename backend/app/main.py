@@ -39,7 +39,7 @@ app.add_middleware(
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 
-from app.routers import auth, users, family, checkins, medicines, health, emergency, referrals, wearable, lab_reports, insights
+from app.routers import auth, users, family, checkins, medicines, health, emergency, referrals, wearable, lab_reports, insights, programs
 from app.routers.ai import session as ai_session
 from app.routers.ai import onboard as ai_onboard
 from app.routers.ai import memory as ai_memory
@@ -55,6 +55,7 @@ app.include_router(referrals.router,    prefix="/api/v1/referrals",    tags=["re
 app.include_router(wearable.router,     prefix="/api/v1/wearable",     tags=["wearable"])
 app.include_router(lab_reports.router,  prefix="/api/v1/lab_reports",  tags=["lab_reports"])
 app.include_router(insights.router,     prefix="/api/v1/insights",     tags=["insights"])
+app.include_router(programs.router,     prefix="/api/v1/programs",     tags=["programs"])
 app.include_router(ai_session.router,   prefix="/api/v1/ai/session",   tags=["ai"])
 app.include_router(ai_onboard.router,   prefix="/api/v1/ai/session/onboard", tags=["ai"])
 app.include_router(ai_memory.router,    prefix="/api/v1/ai/memory",    tags=["ai"])
