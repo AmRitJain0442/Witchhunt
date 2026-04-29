@@ -65,6 +65,34 @@ def _is_normal_range(vital_type: str, primary: float, secondary: float | None) -
     return True, None
 
 
+def _hard_vital_alert(req: ManualVitalRequest) -> dict | None:
+    if req.vital_type == "spo2" and req.value_primary < 88:
+        return {
+            "name": "Critical SpO2",
+            "severity": "critical",
+            "action": "sos",
+            "message": f"SpO2 is {req.value_primary}%. This is critically low and needs urgent medical help.",
+        }
+    if req.vital_type == "blood_sugar" and req.value_primary > 300:
+        return {
+            "name": "Critical Blood Sugar",
+            "severity": "critical",
+            "action": "alert",
+            "message": f"Blood sugar is {req.value_primary} mg/dL. Contact a doctor urgently and follow your sick-day plan.",
+        }
+    if req.vital_type == "blood_pressure":
+        systolic = req.value_primary
+        diastolic = req.value_secondary or 0
+        if systolic > 180 or diastolic > 120:
+            return {
+                "name": "Hypertensive Crisis",
+                "severity": "critical",
+                "action": "sos",
+                "message": f"Blood pressure is {systolic:.0f}/{diastolic:.0f}. This may be a hypertensive crisis.",
+            }
+    return None
+
+
 def _avg(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
@@ -686,6 +714,7 @@ async def get_vitals(uid: str, db: AsyncClient) -> VitalsResponse:
 async def log_vital(uid: str, req: ManualVitalRequest, db: AsyncClient) -> VitalEntryResponse:
     vital_id = str(uuid4())
     is_normal, note = _is_normal_range(req.vital_type, req.value_primary, req.value_secondary)
+    hard_alert = _hard_vital_alert(req)
 
     data: dict = {
         "vital_id": vital_id,
@@ -705,6 +734,38 @@ async def log_vital(uid: str, req: ManualVitalRequest, db: AsyncClient) -> Vital
         .document(vital_id)
         .set(data)
     )
+
+    if hard_alert:
+        alert_id = str(uuid4())
+        alert_data = {
+            "alert_id": alert_id,
+            "uid": uid,
+            "vital_id": vital_id,
+            "vital_type": req.vital_type,
+            "severity": hard_alert["severity"],
+            "action": hard_alert["action"],
+            "title": hard_alert["name"],
+            "message": hard_alert["message"],
+            "created_at": datetime.now(timezone.utc),
+            "resolved": False,
+        }
+        await (
+            db.collection("users")
+            .document(uid)
+            .collection("health_alerts")
+            .document(alert_id)
+            .set(alert_data)
+        )
+        if hard_alert["action"] == "sos":
+            from app.core.enums import SOSSeverity
+            from app.models.emergency import SOSRequest
+            from app.services.emergency_service import trigger_sos
+
+            await trigger_sos(
+                uid,
+                SOSRequest(message=hard_alert["message"], severity=SOSSeverity.CRITICAL),
+                db,
+            )
 
     return VitalEntryResponse(
         vital_id=vital_id,

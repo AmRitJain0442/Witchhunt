@@ -183,7 +183,7 @@ async def get_diabetes_progress(uid: str, db: AsyncClient) -> ProgramProgressRes
     completed_7d = await _completed_task_ids(uid, program_id, db, start=date.today() - timedelta(days=7))
 
     vitals_ref = db.collection("users").document(uid).collection("vitals")
-    vitals_docs = [doc async for doc in vitals_ref.where("vital_type", "==", "blood_glucose").stream()]
+    vitals_docs = [doc async for doc in vitals_ref.where("vital_type", "==", "blood_sugar").stream()]
     glucose_values = [
         float(doc.to_dict().get("value"))
         for doc in sorted(vitals_docs, key=lambda d: d.to_dict().get("recorded_at", datetime.min.replace(tzinfo=timezone.utc)))
