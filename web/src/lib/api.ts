@@ -304,3 +304,40 @@ export const labApi = {
   get: (id: string) => api.get(`/lab_reports/${id}`).then(r => r.data),
   trends: (biomarker: string) => api.get('/lab_reports/biomarkers/trends', { params: { biomarker_name: biomarker } }).then(r => r.data),
 };
+
+export const reportApi = {
+  list: () => api.get('/referrals/').then(r => r.data),
+  createDoctorContext: (payload?: {
+    doctor_name?: string;
+    doctor_specialty?: string;
+    clinic_name?: string;
+    reason_for_visit?: string;
+    notes_for_doctor?: string;
+    checkin_days?: number;
+  }) => api.post('/referrals/', {
+    reason_for_visit: payload?.reason_for_visit || 'Doctor consultation context report',
+    include_sections: [
+      'doctor_snapshot',
+      'demographics',
+      'medical_history',
+      'allergies',
+      'medicines',
+      'past_medicines',
+      'prescriptions',
+      'vitals',
+      'health_scores',
+      'lab_reports',
+      'recent_checkins',
+      'symptom_history',
+      'eating_habits',
+      'wearables',
+    ],
+    checkin_days: payload?.checkin_days ?? 90,
+    language: 'en',
+    doctor_name: payload?.doctor_name,
+    doctor_specialty: payload?.doctor_specialty,
+    clinic_name: payload?.clinic_name,
+    notes_for_doctor: payload?.notes_for_doctor,
+  }).then(r => r.data),
+  share: (id: string) => api.post(`/referrals/${id}/share`).then(r => r.data),
+};

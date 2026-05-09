@@ -223,6 +223,131 @@ export interface HealthAdvisoryResponse {
   generated_at: string;
 }
 
+// Care and mobility
+
+export interface EmergencyContact {
+  member_id: string;
+  display_name: string;
+  phone_number: string;
+  relationship: string;
+  has_app: boolean;
+  notification_methods: Array<'push' | 'sms'>;
+}
+
+export interface EmergencyContactsResponse {
+  contacts: EmergencyContact[];
+  total: number;
+}
+
+export interface SOSResponse {
+  event_id: string;
+  triggered_at: string;
+  notified_contacts: Record<string, unknown>[];
+  location_shared: boolean;
+  message?: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  status: 'active' | 'resolved' | 'false_alarm';
+}
+
+export interface SOSListResponse {
+  events: SOSResponse[];
+  total: number;
+  active_count: number;
+}
+
+export interface WearablePlatformStatus {
+  platform: 'apple_health' | 'google_fit';
+  connected: boolean;
+  last_synced_at?: string | null;
+  sync_errors: string[];
+  metrics_available: string[];
+}
+
+export interface WearableStatusResponse {
+  platforms: WearablePlatformStatus[];
+}
+
+export interface WearableConnectResponse {
+  platform: 'apple_health' | 'google_fit';
+  auth_url?: string | null;
+  instructions: string;
+  is_sdk_based: boolean;
+}
+
+export interface WearableSyncResponse {
+  platform: 'apple_health' | 'google_fit';
+  sync_date: string;
+  records_synced: number;
+  records_failed: number;
+  last_sync_at: string;
+  metrics_updated: string[];
+  triggered_score_recompute: boolean;
+}
+
+export interface ReferralCreateRequest {
+  doctor_name?: string;
+  doctor_specialty?: string;
+  clinic_name?: string;
+  reason_for_visit: string;
+  include_sections?: string[];
+  checkin_days?: number;
+  language?: string;
+  notes_for_doctor?: string;
+}
+
+export interface ReferralResponse {
+  referral_id: string;
+  pdf_url: string;
+  pdf_size_bytes: number;
+  generated_at: string;
+  expires_at: string;
+  included_sections: string[];
+  page_count: number;
+  shareable_link?: string | null;
+}
+
+export interface ReferralListResponse {
+  referrals: ReferralResponse[];
+  total: number;
+}
+
+export interface ShareLinkResponse {
+  shareable_link: string;
+  expires_at: string;
+}
+
+export interface ProgramTask {
+  task_id: string;
+  title: string;
+  description: string;
+  category: 'vitals' | 'medicine' | 'activity' | 'diet' | 'education';
+  completed: boolean;
+}
+
+export interface DiabetesProgramResponse {
+  program_id: string;
+  status: 'active' | 'completed' | 'paused';
+  start_date: string;
+  current_week: number;
+  total_weeks: number;
+  focus: string;
+  tasks_today: ProgramTask[];
+  targets: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProgramProgressResponse {
+  program_id: string;
+  current_week: number;
+  completed_tasks_7d: number;
+  completed_tasks_total: number;
+  fasting_glucose_latest?: number | null;
+  fasting_glucose_trend: 'improving' | 'stable' | 'declining' | 'insufficient_data';
+  hba1c_latest?: number | null;
+  adherence_summary: Record<string, unknown>;
+}
+
 // ── Lab Reports ───────────────────────────────────────────────────────────────
 
 export interface LabReport {

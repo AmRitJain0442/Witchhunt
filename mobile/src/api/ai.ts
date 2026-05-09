@@ -1,6 +1,6 @@
-import auth from '@react-native-firebase/auth';
 import client from './client';
 import { SessionRequest, SessionResponse } from '../types';
+import { auth } from '../lib/firebase';
 
 const sessionId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const ONBOARDING_STAGES = ['welcome', 'demographics', 'medical_history', 'medications', 'allergies', 'lifestyle', 'family_goals', 'finalize'];
@@ -9,7 +9,7 @@ export const sendMessage = (data: SessionRequest) =>
   client
     .post('/ai/session', {
       session_id: sessionId(),
-      user_id_hash: auth().currentUser?.uid ?? 'mobile-user',
+      user_id_hash: auth.currentUser?.uid ?? 'mobile-user',
       message: data.message,
       conversation_history: data.conversation_history ?? [],
       memory_file: data.memory_file ?? {},
@@ -36,7 +36,7 @@ export const startOnboarding = (
   client
     .post('/ai/session/onboard', {
       onboard_session_id: sessionId(),
-      user_id_hash: auth().currentUser?.uid ?? 'mobile-user',
+      user_id_hash: auth.currentUser?.uid ?? 'mobile-user',
       stage,
       stage_index: Math.max(0, ONBOARDING_STAGES.indexOf(stage)),
       total_stages: 7,

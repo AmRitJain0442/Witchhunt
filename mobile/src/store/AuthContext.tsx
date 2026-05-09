@@ -1,11 +1,19 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import * as SecureStore from 'expo-secure-store';
 import { login, register } from '../api/auth';
 import { User } from '../types';
+import {
+  auth,
+  createUserWithEmailAndPassword,
+  FirebaseUser,
+  firebaseSignOut,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from '../lib/firebase';
 
 interface AuthContextValue {
-  firebaseUser: FirebaseAuthTypes.User | null;
+  firebaseUser: FirebaseUser | null;
   appUser: User | null;
   isLoading: boolean;
   signInWithEmail: (email: string, password: string) => Promise<void>;
@@ -125,12 +133,12 @@ function removeValue(root: Record<string, unknown>, path: string) {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseAuthTypes.User | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [appUser, setAppUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = auth().onAuthStateChanged(async (fbUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
       if (fbUser) {
         try {
@@ -149,15 +157,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithEmail = async (email: string, password: string) => {
-    const cred = await auth().signInWithEmailAndPassword(email, password);
+    const cred = await signInWithEmailAndPassword(auth, email, password);
     const token = await cred.user.getIdToken();
     const response = await login(token);
     setAppUser(response.user);
   };
 
   const signUpWithEmail = async (email: string, password: string, name: string) => {
-    const cred = await auth().createUserWithEmailAndPassword(email, password);
-    await cred.user.updateProfile({ displayName: name });
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(cred.user, { displayName: name });
     const token = await cred.user.getIdToken(true);
     const response = await register(token, undefined, name);
     // Patch the name in immediately
@@ -165,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await auth().signOut();
+    await firebaseSignOut(auth);
     setAppUser(null);
     setFirebaseUser(null);
   };

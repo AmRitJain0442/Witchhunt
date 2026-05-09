@@ -7,6 +7,7 @@ import {
   HeartPulse,
   LayoutDashboard,
   LogOut,
+  NotebookText,
   Pill,
   ShieldPlus,
   UsersRound,
@@ -25,6 +26,7 @@ const nav = [
   { href: '/ai', label: 'Kutumb AI', icon: Bot },
   { href: '/family', label: 'Family', icon: UsersRound },
   { href: '/lab-reports', label: 'Lab reports', icon: FileText },
+  { href: '/report', label: 'Doctor report', icon: NotebookText },
 ];
 
 type SidebarProps = {

@@ -1,6 +1,5 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Text, View } from 'react-native';
 import { COLORS, FONTS } from '../constants';
 
@@ -9,6 +8,7 @@ import CheckinScreen from '../screens/checkins/CheckinScreen';
 import MedicinesScreen from '../screens/medicines/MedicinesScreen';
 import AIChatScreen from '../screens/ai/AIChatScreen';
 import FamilyScreen from '../screens/family/FamilyScreen';
+import CareScreen from '../screens/care/CareScreen';
 
 export type TabParamList = {
   Home: undefined;
@@ -16,21 +16,43 @@ export type TabParamList = {
   Medicines: undefined;
   AIChat: undefined;
   Family: undefined;
+  Care: undefined;
 };
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const icons: Record<string, string> = {
-    Home: '🏠',
-    Checkin: '✏️',
-    Medicines: '💊',
-    AIChat: '🤖',
-    Family: '👨‍👩‍👧',
+    Home: 'H',
+    Checkin: 'C',
+    Medicines: 'M',
+    AIChat: 'AI',
+    Family: 'F',
+    Care: '+',
   };
+
   return (
-    <View style={{ alignItems: 'center' }}>
-      <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.5 }}>{icons[name]}</Text>
+    <View
+      style={{
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: focused ? COLORS.primary : COLORS.background,
+        borderWidth: 1,
+        borderColor: focused ? COLORS.primary : COLORS.border,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: name === 'AIChat' ? 10 : 13,
+          color: focused ? COLORS.text.inverse : COLORS.text.secondary,
+          fontWeight: FONTS.weights.bold,
+        }}
+      >
+        {icons[name]}
+      </Text>
     </View>
   );
 }
@@ -46,7 +68,7 @@ export default function AppNavigator() {
           backgroundColor: COLORS.surface,
           borderTopColor: COLORS.border,
           paddingBottom: 4,
-          height: 60,
+          height: 64,
         },
         tabBarLabelStyle: {
           fontSize: FONTS.sizes.xs,
@@ -65,6 +87,7 @@ export default function AppNavigator() {
       <Tab.Screen name="Medicines" component={MedicinesScreen} options={{ title: 'Medicines' }} />
       <Tab.Screen name="AIChat" component={AIChatScreen} options={{ title: 'Kutumb AI' }} />
       <Tab.Screen name="Family" component={FamilyScreen} options={{ title: 'Family' }} />
+      <Tab.Screen name="Care" component={CareScreen} options={{ title: 'Care' }} />
     </Tab.Navigator>
   );
 }

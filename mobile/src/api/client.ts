@@ -1,6 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import auth from '@react-native-firebase/auth';
 import { API_BASE_URL } from '../constants';
+import { auth } from '../lib/firebase';
 
 const client = axios.create({
   baseURL: API_BASE_URL,
@@ -10,7 +10,7 @@ const client = axios.create({
 
 // Inject Firebase ID token on every request
 client.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-  const user = auth().currentUser;
+  const user = auth.currentUser;
   if (user) {
     const token = await user.getIdToken();
     config.headers.Authorization = `Bearer ${token}`;

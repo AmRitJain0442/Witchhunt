@@ -1,9 +1,9 @@
-import auth from '@react-native-firebase/auth';
 import client from './client';
 import { AuthResponse, User } from '../types';
+import { auth } from '../lib/firebase';
 
 function normalizeAuth(payload: Record<string, unknown>): AuthResponse {
-  const fb = auth().currentUser;
+  const fb = auth.currentUser;
   const displayName = String(payload.display_name ?? fb?.displayName ?? fb?.email ?? 'Kutumb User');
   return {
     access_token: '',
