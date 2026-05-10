@@ -6,17 +6,14 @@ import json
 import logging
 import time
 
-from anthropic import AsyncAnthropic
 from fastapi import APIRouter
 
-from app.config import get_settings
 from app.dependencies import CurrentUserDep
 from app.models.session import AIResponseContent, OnboardRequest, OnboardResponse
+from app.services.openrouter_service import openrouter_chat
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-settings = get_settings()
-_client = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
 STAGES = [
     "welcome",
@@ -156,13 +153,13 @@ async def run_onboard_session(req: OnboardRequest, current_user: CurrentUserDep)
     )
 
     try:
-        response = await _client.messages.create(
-            model="claude-sonnet-4-6",
+        raw = await openrouter_chat(
+            system_prompt,
+            _build_onboard_prompt(req),
             max_tokens=2000,
-            system=system_prompt,
-            messages=[{"role": "user", "content": _build_onboard_prompt(req)}],
+            json_mode=True,
         )
-        raw = response.content[0].text.strip()
+        raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):

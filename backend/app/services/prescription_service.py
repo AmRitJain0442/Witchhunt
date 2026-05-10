@@ -5,7 +5,6 @@ import re
 from datetime import date, datetime, timedelta, timezone
 from uuid import uuid4
 
-import httpx
 from google.cloud.firestore import AsyncClient
 
 from app.config import get_settings
@@ -22,6 +21,7 @@ from app.models.prescriptions import (
     PrescriptionOCRStatusResponse,
     PrescriptionResponse,
 )
+from app.services.openrouter_service import openrouter_vision_json
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ _FREQUENCY_PATTERNS: list[tuple[str, str]] = [
     (r"\b(as needed|sos|prn)\b", "as_needed"),
 ]
 
-_GEMINI_PRESCRIPTION_SCHEMA: dict = {
+_PRESCRIPTION_SCHEMA: dict = {
     "type": "object",
     "properties": {
         "raw_text": {"type": "string"},
@@ -101,7 +101,7 @@ _GEMINI_PRESCRIPTION_SCHEMA: dict = {
     "required": ["raw_text", "doctor_name", "hospital_name", "medicines", "warnings"],
 }
 
-_GEMINI_PRESCRIPTION_PROMPT = """
+_PRESCRIPTION_PROMPT = """
 Extract medicines from this prescription for a patient medicine cabinet.
 Return only JSON that matches the schema.
 
@@ -221,7 +221,7 @@ async def upload_prescription(
         "job_id": job_id,
         "uid": uid,
         "type": "prescription",
-        "engine": get_settings().gemini_model,
+        "engine": get_settings().openrouter_vision_model,
         "target_id": prescription_id,
         "status": "pending",
         "progress_pct": 0,
@@ -420,15 +420,6 @@ async def get_ocr_status(
     )
 
 
-def _extract_candidate_text(response: dict) -> str:
-    parts = (
-        response.get("candidates", [{}])[0]
-        .get("content", {})
-        .get("parts", [])
-    )
-    return "".join(part.get("text", "") for part in parts).strip()
-
-
 def _parse_json_response(text: str) -> dict:
     cleaned = text.strip()
     if cleaned.startswith("```"):
@@ -437,56 +428,14 @@ def _parse_json_response(text: str) -> dict:
     return json.loads(cleaned)
 
 
-async def _extract_prescription_with_gemini(file_bytes: bytes, content_type: str) -> dict:
-    settings = get_settings()
-    if not settings.gemini_api_key:
-        raise ValueError("GEMINI_API_KEY is required for prescription medicine extraction")
-
+async def _extract_prescription_with_openrouter(file_bytes: bytes, content_type: str) -> dict:
     encoded = base64.b64encode(file_bytes).decode("ascii")
-    payload = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [
-                    {
-                        "inline_data": {
-                            "mime_type": content_type,
-                            "data": encoded,
-                        }
-                    },
-                    {"text": _GEMINI_PRESCRIPTION_PROMPT},
-                ],
-            }
-        ],
-        "generationConfig": {
-            "temperature": 0.1,
-            "responseMimeType": "application/json",
-            "responseJsonSchema": _GEMINI_PRESCRIPTION_SCHEMA,
-        },
-    }
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{settings.gemini_model}:generateContent"
+    data_url = f"data:{content_type};base64,{encoded}"
+    prompt = (
+        f"{_PRESCRIPTION_PROMPT}\n\n"
+        f"JSON schema:\n{json.dumps(_PRESCRIPTION_SCHEMA, default=str)}"
     )
-
-    async with httpx.AsyncClient(timeout=90.0) as client:
-        response = await client.post(
-            url,
-            headers={
-                "Content-Type": "application/json",
-                "x-goog-api-key": settings.gemini_api_key,
-            },
-            json=payload,
-        )
-
-    if response.status_code >= 400:
-        detail = response.text[:500]
-        raise ValueError(f"Gemini prescription extraction failed: {detail}")
-
-    text = _extract_candidate_text(response.json())
-    if not text:
-        raise ValueError("Gemini returned no prescription extraction content")
-    return _parse_json_response(text)
+    return await openrouter_vision_json(prompt, data_url)
 
 
 def _detect_frequency(text: str) -> str:
@@ -717,9 +666,9 @@ async def process_prescription_extraction(
     await prescription_ref.update({"status": PrescriptionStatus.PROCESSING.value})
 
     try:
-        gemini_result = await _extract_prescription_with_gemini(file_bytes, content_type)
-        raw_text = str(gemini_result.get("raw_text") or "").strip()
-        extracted = _normalize_extracted_medicines(gemini_result.get("medicines"))
+        extraction_result = await _extract_prescription_with_openrouter(file_bytes, content_type)
+        raw_text = str(extraction_result.get("raw_text") or "").strip()
+        extracted = _normalize_extracted_medicines(extraction_result.get("medicines"))
         confidences = [
             med["confidence"]
             for med in extracted
@@ -734,20 +683,20 @@ async def process_prescription_extraction(
             "extracted_medicines": extracted,
             "ocr_confidence_score": confidence_score,
             "raw_ocr_text": raw_text,
-            "extraction_engine": get_settings().gemini_model,
-            "ai_warnings": gemini_result.get("warnings", []),
+            "extraction_engine": get_settings().openrouter_vision_model,
+            "ai_warnings": extraction_result.get("warnings", []),
             "parsed_at": now,
         }
-        if not current_data.get("doctor_name") and gemini_result.get("doctor_name"):
-            prescription_updates["doctor_name"] = gemini_result["doctor_name"]
-        if not current_data.get("hospital_name") and gemini_result.get("hospital_name"):
-            prescription_updates["hospital_name"] = gemini_result["hospital_name"]
+        if not current_data.get("doctor_name") and extraction_result.get("doctor_name"):
+            prescription_updates["doctor_name"] = extraction_result["doctor_name"]
+        if not current_data.get("hospital_name") and extraction_result.get("hospital_name"):
+            prescription_updates["hospital_name"] = extraction_result["hospital_name"]
         await prescription_ref.update(prescription_updates)
         await job_ref.update({
             "status": "completed",
             "progress_pct": 100,
             "medicines_found": len(extracted),
-            "engine": get_settings().gemini_model,
+            "engine": get_settings().openrouter_vision_model,
             "error_message": None,
             "updated_at": now,
         })

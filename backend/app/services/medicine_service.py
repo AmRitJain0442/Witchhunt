@@ -192,7 +192,7 @@ async def create_medicine(
         if status_val != PrescriptionStatus.PARSED.value:
             raise ValidationError(
                 f"Prescription is not yet parsed (current status: {status_val}). "
-                "Wait for Gemini extraction to complete."
+                "Wait for prescription extraction to complete."
             )
         prescription_valid = True
 

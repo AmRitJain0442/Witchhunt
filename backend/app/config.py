@@ -10,15 +10,15 @@ class Settings(BaseSettings):
     firebase_service_account_key_path: str = "./serviceAccountKey.json"
     firebase_storage_bucket: str
 
-    # Anthropic
-    anthropic_api_key: str
+    # OpenRouter (LLM gateway)
+    openrouter_api_key: str = ""
+    openrouter_model: str = "anthropic/claude-sonnet-4.6"
+    openrouter_vision_model: str = "anthropic/claude-sonnet-4.6"
+    openrouter_site_url: str = "http://localhost:8000"
+    openrouter_app_name: str = "Kutumb"
 
     # Google Cloud
     google_application_credentials: str = "./serviceAccountKey.json"
-
-    # Gemini
-    gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
 
     # OpenAI (Whisper fallback)
     openai_api_key: str = ""

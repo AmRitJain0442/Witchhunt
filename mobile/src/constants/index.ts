@@ -1,6 +1,4 @@
-export const API_BASE_URL = __DEV__
-  ? 'http://10.0.2.2:8000/api/v1'   // Android emulator → localhost
-  : 'https://api.kutumb.health/api/v1';
+export const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
 
 export const COLORS = {
   primary: '#2D6A4F',      // Forest green

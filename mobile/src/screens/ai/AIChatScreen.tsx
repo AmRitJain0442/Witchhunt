@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
+  Animated,
+  Easing,
   View,
   Text,
   FlatList,
@@ -10,7 +12,9 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { sendMessage } from '../../api/ai';
 import { loadLocalMemory, saveLocalMemory, applyMemoryPatches } from '../../store/AuthContext';
 import { ConversationMessage, FiredTrigger } from '../../types';
@@ -40,6 +44,8 @@ function TriggerAlert({ trigger }: { trigger: FiredTrigger }) {
 }
 
 export default function AIChatScreen() {
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const [messages, setMessages] = useState<ConversationMessage[]>([WELCOME_MESSAGE]);
   const [conversationHistory, setConversationHistory] = useState<ConversationMessage[]>([]);
   const [input, setInput] = useState('');
@@ -47,10 +53,24 @@ export default function AIChatScreen() {
   const [firedTriggers, setFiredTriggers] = useState<FiredTrigger[]>([]);
   const [localMemory, setLocalMemory] = useState<Record<string, unknown>>({});
   const listRef = useRef<FlatList>(null);
+  const sensorAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadLocalMemory().then(setLocalMemory);
   }, []);
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(sensorAnim, {
+        toValue: 1,
+        duration: 1800,
+        easing: Easing.inOut(Easing.quad),
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [sensorAnim]);
 
   const send = async () => {
     const text = input.trim();
@@ -167,7 +187,8 @@ export default function AIChatScreen() {
         </View>
       )}
 
-      <View style={styles.inputRow}>
+      <View style={[styles.inputDock, { paddingBottom: Math.max(insets.bottom + SPACING.sm, 40) }]}>
+        <View style={styles.inputRow}>
         <TextInput
           style={styles.input}
           value={input}
@@ -185,6 +206,24 @@ export default function AIChatScreen() {
         >
           <Text style={styles.sendIcon}>➤</Text>
         </TouchableOpacity>
+        </View>
+        <View style={styles.sensorTrack} pointerEvents="none">
+          <Animated.View
+            style={[
+              styles.sensorLine,
+              {
+                transform: [
+                  {
+                    translateX: sensorAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-96, width],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -257,12 +296,14 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   typingText: { color: COLORS.text.secondary, fontSize: FONTS.sizes.sm },
-  inputRow: {
-    flexDirection: 'row',
+  inputDock: {
     padding: SPACING.sm,
     backgroundColor: COLORS.surface,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
+  },
+  inputRow: {
+    flexDirection: 'row',
     alignItems: 'flex-end',
     gap: SPACING.sm,
   },
@@ -288,4 +329,17 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: { opacity: 0.5 },
   sendIcon: { color: COLORS.text.inverse, fontSize: 18 },
+  sensorTrack: {
+    height: 3,
+    marginTop: SPACING.sm,
+    borderRadius: RADIUS.full,
+    overflow: 'hidden',
+    backgroundColor: '#E7F2EE',
+  },
+  sensorLine: {
+    width: 96,
+    height: 3,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.primary,
+  },
 });

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,49 +6,80 @@ import {
   StyleSheet,
   RefreshControl,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
+import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../store/AuthContext';
 import { getHealthScores, getAdvisories, getTodaySchedule } from '../../api/health';
 import { HealthScoreResponse, HealthAdvisoryResponse, TodayScheduleResponse } from '../../types';
 import { COLORS, FONTS, SPACING, RADIUS } from '../../constants';
+import type { TabParamList } from '../../navigation/AppNavigator';
 
-function ScoreRing({ score, label, color }: { score: number; label: string; color: string }) {
-  const letter = label[0];
+type QuickAction = {
+  label: string;
+  body: string;
+  target: keyof TabParamList;
+  tone: string;
+};
+
+function scoreStatus(score?: number) {
+  if (score === undefined) return { label: 'Start tracking', color: COLORS.text.secondary };
+  if (score >= 80) return { label: 'Stable', color: COLORS.success };
+  if (score >= 60) return { label: 'Watch', color: COLORS.warning };
+  return { label: 'Needs attention', color: COLORS.error };
+}
+
+function formatDate(value?: string) {
+  if (!value) return 'Not computed yet';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Recently updated';
+  return parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function StatTile({ label, value, tone }: { label: string; value: string | number; tone: string }) {
   return (
-    <View style={styles.scoreRingContainer}>
-      <View style={[styles.scoreRing, { borderColor: color }]}>
-        <Text style={[styles.scoreValue, { color }]}>{Math.round(score)}</Text>
-        <Text style={[styles.scoreLabel, { color }]}>{letter}</Text>
+    <View style={styles.statTile}>
+      <View style={[styles.statMarker, { backgroundColor: tone }]} />
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function OrganBar({ label, score, color }: { label: string; score: number; color: string }) {
+  const width = `${Math.max(4, Math.min(100, Math.round(score)))}%`;
+  return (
+    <View style={styles.organRow}>
+      <View style={styles.organHeader}>
+        <Text style={styles.organName}>{label}</Text>
+        <Text style={styles.organScore}>{Math.round(score)}</Text>
       </View>
-      <Text style={styles.scoreName}>{label}</Text>
+      <View style={styles.organTrack}>
+        <View style={[styles.organFill, { width: width as any, backgroundColor: color }]} />
+      </View>
     </View>
   );
 }
 
 function AdvisoryCard({ title, body, severity }: { title: string; body: string; severity: string }) {
-  const bgColors = {
-    critical: '#FFF0F0',
-    warning: '#FFFBF0',
-    info: '#F0F8FF',
-  };
-  const borderColors = {
-    critical: COLORS.error,
-    warning: COLORS.warning,
-    info: COLORS.primaryLight,
-  };
-  const icons = { critical: '🚨', warning: '⚠️', info: 'ℹ️' };
-  const sev = severity as keyof typeof bgColors;
+  const tone = severity === 'urgent' || severity === 'critical'
+    ? COLORS.error
+    : severity === 'warning'
+      ? COLORS.warning
+      : COLORS.primary;
 
   return (
-    <View style={[styles.advisoryCard, { backgroundColor: bgColors[sev], borderLeftColor: borderColors[sev] }]}>
-      <Text style={styles.advisoryTitle}>{icons[sev]} {title}</Text>
-      <Text style={styles.advisoryBody}>{body}</Text>
+    <View style={styles.advisoryCard}>
+      <View style={[styles.advisoryRail, { backgroundColor: tone }]} />
+      <View style={styles.advisoryContent}>
+        <Text style={styles.advisoryTitle}>{title}</Text>
+        <Text style={styles.advisoryBody}>{body}</Text>
+      </View>
     </View>
   );
 }
 
 export default function HomeScreen() {
+  const navigation = useNavigation<NavigationProp<TabParamList>>();
   const { appUser } = useAuth();
   const [scores, setScores] = useState<HealthScoreResponse | null>(null);
   const [advisories, setAdvisories] = useState<HealthAdvisoryResponse | null>(null);
@@ -56,18 +87,14 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    try {
-      const [s, a, t] = await Promise.allSettled([
-        getHealthScores(),
-        getAdvisories(),
-        getTodaySchedule(),
-      ]);
-      if (s.status === 'fulfilled') setScores(s.value);
-      if (a.status === 'fulfilled') setAdvisories(a.value);
-      if (t.status === 'fulfilled') setTodaySchedule(t.value);
-    } catch {
-      // Fail silently — API may not be running in dev
-    }
+    const [scoreResult, advisoryResult, scheduleResult] = await Promise.allSettled([
+      getHealthScores(),
+      getAdvisories(),
+      getTodaySchedule(),
+    ]);
+    if (scoreResult.status === 'fulfilled') setScores(scoreResult.value);
+    if (advisoryResult.status === 'fulfilled') setAdvisories(advisoryResult.value);
+    if (scheduleResult.status === 'fulfilled') setTodaySchedule(scheduleResult.value);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -78,16 +105,33 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, [load]);
 
-  const greeting = () => {
+  const greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
-  };
+  }, []);
 
-  const pendingDoses = todaySchedule?.schedules.filter(
-    (s) => s.status === 'pending' || s.status === 'overdue',
-  ).length ?? 0;
+  const firstName = appUser?.name?.split(' ')[0] || 'there';
+  const pendingDoses = todaySchedule?.schedules.filter((s) => s.status === 'pending' || s.status === 'overdue').length ?? 0;
+  const completedDoses = todaySchedule?.schedules.filter((s) => s.status === 'taken').length ?? 0;
+  const activeAdvisories = advisories?.advisories.length ?? 0;
+  const overallScore = scores ? Math.round(scores.overall) : undefined;
+  const status = scoreStatus(overallScore);
+
+  const dailyFocus = useMemo(() => {
+    if (pendingDoses > 0) return { title: 'Medicine follow-up', body: 'Review pending doses before the next scheduled time.' };
+    if (!scores) return { title: 'First check-in', body: 'Complete a check-in so Kutumb can build your health baseline.' };
+    if (activeAdvisories > 0) return { title: 'Review advisories', body: 'Check the latest health advisories and mark what you have handled.' };
+    return { title: 'Keep the streak', body: 'Log sleep, stress, hydration, and symptoms to keep your dashboard accurate.' };
+  }, [activeAdvisories, pendingDoses, scores]);
+
+  const quickActions: QuickAction[] = [
+    { label: 'Check in', body: 'Mood, symptoms, sleep, water, pain.', target: 'Checkin', tone: COLORS.primary },
+    { label: 'Medicines', body: 'Dose schedule and prescriptions.', target: 'Medicines', tone: COLORS.secondary },
+    { label: 'Ask AI', body: 'Health questions and care planning.', target: 'AIChat', tone: COLORS.brainScore },
+    { label: 'Care hub', body: 'SOS, reports, programs, wearables.', target: 'Care', tone: COLORS.heartScore },
+  ];
 
   return (
     <ScrollView
@@ -95,209 +139,283 @@ export default function HomeScreen() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
     >
-      {/* Greeting */}
-      <View style={styles.greetingSection}>
-        <Text style={styles.greetingText}>
-          {greeting()}, {appUser?.name?.split(' ')[0] ?? 'there'} 🙏
-        </Text>
-        {pendingDoses > 0 && (
-          <View style={styles.pillBadge}>
-            <Text style={styles.pillBadgeText}>
-              💊 {pendingDoses} dose{pendingDoses > 1 ? 's' : ''} pending
-            </Text>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.eyebrow}>Kutumb health dashboard</Text>
+          <Text style={styles.greeting}>{greeting}, {firstName}</Text>
+        </View>
+        <View style={[styles.statusPill, { borderColor: status.color }]}>
+          <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+        </View>
+      </View>
+
+      <View style={styles.heroPanel}>
+        <View style={styles.heroTop}>
+          <View>
+            <Text style={styles.heroLabel}>Overall health</Text>
+            <Text style={styles.heroScore}>{overallScore ?? '--'}</Text>
+            <Text style={styles.heroSub}>{scores ? `Updated ${formatDate(scores.computed_at)}` : 'Waiting for your first check-in'}</Text>
+          </View>
+          <View style={styles.heroSummary}>
+            <Text style={styles.heroSummaryTitle}>{dailyFocus.title}</Text>
+            <Text style={styles.heroSummaryBody}>{dailyFocus.body}</Text>
+          </View>
+        </View>
+        <View style={styles.scoreTrack}>
+          <View style={[styles.scoreFill, { width: `${overallScore ?? 12}%` as any }]} />
+        </View>
+      </View>
+
+      <View style={styles.statGrid}>
+        <StatTile label="Pending doses" value={pendingDoses} tone={pendingDoses > 0 ? COLORS.warning : COLORS.success} />
+        <StatTile label="Taken today" value={completedDoses} tone={COLORS.primary} />
+        <StatTile label="Advisories" value={activeAdvisories} tone={activeAdvisories > 0 ? COLORS.secondary : COLORS.success} />
+        <StatTile label="Family" value={appUser?.family_count ?? 0} tone={COLORS.brainScore} />
+      </View>
+
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Care command center</Text>
+      </View>
+      <View style={styles.quickGrid}>
+        {quickActions.map((action) => (
+          <TouchableOpacity
+            key={action.label}
+            style={styles.quickAction}
+            onPress={() => navigation.navigate(action.target)}
+          >
+            <View style={[styles.quickDot, { backgroundColor: action.tone }]} />
+            <Text style={styles.quickTitle}>{action.label}</Text>
+            <Text style={styles.quickBody}>{action.body}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <View style={styles.panel}>
+        <View style={styles.sectionHeaderCompact}>
+          <Text style={styles.sectionTitle}>Organ health</Text>
+          <Text style={styles.sectionMeta}>0-100</Text>
+        </View>
+        {scores ? (
+          <>
+            <OrganBar label="Heart" score={scores.heart.score} color={COLORS.heartScore} />
+            <OrganBar label="Brain" score={scores.brain.score} color={COLORS.brainScore} />
+            <OrganBar label="Gut" score={scores.gut.score} color={COLORS.gutScore} />
+            <OrganBar label="Lungs" score={scores.lungs.score} color={COLORS.lungsScore} />
+          </>
+        ) : (
+          <View style={styles.emptyBlock}>
+            <Text style={styles.emptyTitle}>No score yet</Text>
+            <Text style={styles.emptyBody}>Daily check-ins, medicines, vitals, and reports will populate these organ scores.</Text>
           </View>
         )}
       </View>
 
-      {/* Overall score */}
-      {scores && (
-        <View style={styles.overallCard}>
-          <View style={styles.overallLeft}>
-            <Text style={styles.overallLabel}>Overall Health</Text>
-            <Text style={styles.overallScore}>{Math.round(scores.overall)}</Text>
-            <Text style={styles.overallSub}>out of 100</Text>
-          </View>
-          <View style={styles.organScores}>
-            <ScoreRing score={scores.heart.score} label="Heart" color={COLORS.heartScore} />
-            <ScoreRing score={scores.brain.score} label="Brain" color={COLORS.brainScore} />
-            <ScoreRing score={scores.gut.score} label="Gut" color={COLORS.gutScore} />
-            <ScoreRing score={scores.lungs.score} label="Lungs" color={COLORS.lungsScore} />
-          </View>
+      <View style={styles.panel}>
+        <View style={styles.sectionHeaderCompact}>
+          <Text style={styles.sectionTitle}>Today's care plan</Text>
+          <Text style={styles.sectionMeta}>{todaySchedule ? `${Math.round(todaySchedule.adherence_pct)}% done` : 'Setup'}</Text>
         </View>
-      )}
-
-      {!scores && (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyIcon}>📊</Text>
-          <Text style={styles.emptyTitle}>No health data yet</Text>
-          <Text style={styles.emptyBody}>Do your first check-in to start tracking your health score.</Text>
-        </View>
-      )}
-
-      {/* Today's medicines */}
-      {todaySchedule && todaySchedule.schedules.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Today's medicines</Text>
-          <View style={styles.adherenceBar}>
-            <View
-              style={[styles.adherenceFill, { width: `${todaySchedule.adherence_pct}%` as any }]}
-            />
-          </View>
-          <Text style={styles.adherenceText}>{Math.round(todaySchedule.adherence_pct)}% adherence today</Text>
-          {todaySchedule.schedules.slice(0, 4).map((s, i) => (
-            <View key={i} style={[styles.doseRow, s.status === 'overdue' && styles.overdueRow]}>
-              <Text style={styles.doseIcon}>
-                {s.status === 'taken' ? '✅' : s.status === 'skipped' ? '⏭️' : s.status === 'overdue' ? '🔴' : '⏰'}
-              </Text>
-              <View style={styles.doseInfo}>
-                <Text style={styles.doseName}>{s.medicine_name}</Text>
-                <Text style={styles.doseDosage}>{s.dosage} · {s.dose_time}</Text>
-              </View>
-              <Text style={[styles.doseStatus, s.status === 'overdue' && styles.overdueText]}>
-                {s.status}
-              </Text>
+        {todaySchedule && todaySchedule.schedules.length > 0 ? (
+          <>
+            <View style={styles.adherenceBar}>
+              <View style={[styles.adherenceFill, { width: `${todaySchedule.adherence_pct}%` as any }]} />
             </View>
-          ))}
-        </View>
-      )}
+            {todaySchedule.schedules.slice(0, 5).map((dose, index) => (
+              <View key={`${dose.medicine_id}-${dose.dose_time}-${index}`} style={styles.timelineRow}>
+                <View style={[styles.timelineDot, dose.status === 'overdue' && styles.timelineDotAlert]} />
+                <View style={styles.timelineContent}>
+                  <Text style={styles.timelineTitle}>{dose.medicine_name}</Text>
+                  <Text style={styles.timelineBody}>{dose.dosage} at {dose.dose_time}</Text>
+                </View>
+                <Text style={[styles.timelineStatus, dose.status === 'overdue' && styles.timelineStatusAlert]}>{dose.status}</Text>
+              </View>
+            ))}
+          </>
+        ) : (
+          <View style={styles.emptyBlock}>
+            <Text style={styles.emptyTitle}>No medicine schedule yet</Text>
+            <Text style={styles.emptyBody}>Add medicines or upload a prescription to turn this into a daily timeline.</Text>
+          </View>
+        )}
+      </View>
 
-      {/* Advisories */}
-      {advisories && advisories.advisories.length > 0 && (
-        <View style={styles.section}>
+      <View style={styles.panel}>
+        <View style={styles.sectionHeaderCompact}>
           <Text style={styles.sectionTitle}>Health advisories</Text>
-          {advisories.advisories.map((a, i) => (
-            <AdvisoryCard key={i} title={a.title} body={a.body} severity={a.severity} />
-          ))}
+          <Text style={styles.sectionMeta}>{activeAdvisories}</Text>
         </View>
-      )}
+        {advisories && advisories.advisories.length > 0 ? (
+          advisories.advisories.slice(0, 3).map((advisory, index) => (
+            <AdvisoryCard key={`${advisory.title}-${index}`} title={advisory.title} body={advisory.body} severity={advisory.severity} />
+          ))
+        ) : (
+          <View style={styles.emptyBlock}>
+            <Text style={styles.emptyTitle}>No advisories</Text>
+            <Text style={styles.emptyBody}>Kutumb will surface trends, medicine warnings, and follow-ups here.</Text>
+          </View>
+        )}
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  content: { padding: SPACING.md, paddingBottom: SPACING.xl },
-  greetingSection: { marginBottom: SPACING.md },
-  greetingText: {
-    fontSize: FONTS.sizes.xl,
-    fontWeight: FONTS.weights.bold,
-    color: COLORS.text.primary,
+  content: { padding: SPACING.md, paddingBottom: SPACING.xxl },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: SPACING.md,
+    gap: SPACING.md,
   },
-  pillBadge: {
-    backgroundColor: '#FFF3E0',
+  eyebrow: {
+    color: COLORS.primary,
+    fontSize: FONTS.sizes.xs,
+    fontWeight: FONTS.weights.bold,
+    textTransform: 'uppercase',
+  },
+  greeting: {
+    color: COLORS.text.primary,
+    fontSize: FONTS.sizes.xxl,
+    fontWeight: FONTS.weights.bold,
+    marginTop: SPACING.xs,
+  },
+  statusPill: {
+    borderWidth: 1,
     borderRadius: RADIUS.full,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
-    alignSelf: 'flex-start',
-    marginTop: SPACING.xs,
+    backgroundColor: COLORS.surface,
   },
-  pillBadgeText: { color: COLORS.secondary, fontWeight: FONTS.weights.medium, fontSize: FONTS.sizes.sm },
-  overallCard: {
-    backgroundColor: COLORS.primary,
+  statusText: { fontSize: FONTS.sizes.xs, fontWeight: FONTS.weights.bold },
+  heroPanel: {
+    backgroundColor: COLORS.primaryDark,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
     marginBottom: SPACING.md,
   },
-  overallLeft: { flex: 1 },
-  overallLabel: { color: 'rgba(255,255,255,0.8)', fontSize: FONTS.sizes.sm },
-  overallScore: {
+  heroTop: { flexDirection: 'row', gap: SPACING.md },
+  heroLabel: { color: 'rgba(255,255,255,0.72)', fontSize: FONTS.sizes.sm },
+  heroScore: {
     color: COLORS.text.inverse,
-    fontSize: 56,
+    fontSize: 58,
     fontWeight: FONTS.weights.bold,
-    lineHeight: 60,
+    lineHeight: 64,
   },
-  overallSub: { color: 'rgba(255,255,255,0.6)', fontSize: FONTS.sizes.sm },
-  organScores: { gap: SPACING.xs },
-  scoreRingContainer: { alignItems: 'center' },
-  scoreRing: {
-    width: 52,
-    height: 52,
-    borderRadius: RADIUS.full,
-    borderWidth: 3,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  },
-  scoreValue: { fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.bold },
-  scoreLabel: { fontSize: 9, fontWeight: FONTS.weights.medium },
-  scoreName: { color: 'rgba(255,255,255,0.7)', fontSize: 9, marginTop: 2 },
-  emptyCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.xl,
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  emptyIcon: { fontSize: 40 },
-  emptyTitle: {
-    fontSize: FONTS.sizes.lg,
-    fontWeight: FONTS.weights.semibold,
-    color: COLORS.text.primary,
-    marginTop: SPACING.sm,
-  },
-  emptyBody: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
-    marginTop: SPACING.xs,
-  },
-  section: { marginBottom: SPACING.md },
-  sectionTitle: {
-    fontSize: FONTS.sizes.lg,
-    fontWeight: FONTS.weights.semibold,
-    color: COLORS.text.primary,
-    marginBottom: SPACING.sm,
-  },
-  adherenceBar: {
-    height: 6,
-    backgroundColor: COLORS.border,
-    borderRadius: RADIUS.full,
-    overflow: 'hidden',
-    marginBottom: SPACING.xs,
-  },
-  adherenceFill: {
-    height: '100%',
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.full,
-  },
-  adherenceText: { color: COLORS.text.secondary, fontSize: FONTS.sizes.sm, marginBottom: SPACING.sm },
-  doseRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    padding: SPACING.sm,
-    marginBottom: SPACING.xs,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    gap: SPACING.sm,
-  },
-  overdueRow: { borderColor: COLORS.error, backgroundColor: '#FFF5F5' },
-  doseIcon: { fontSize: 20 },
-  doseInfo: { flex: 1 },
-  doseName: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.medium, color: COLORS.text.primary },
-  doseDosage: { fontSize: FONTS.sizes.xs, color: COLORS.text.secondary },
-  doseStatus: {
-    fontSize: FONTS.sizes.xs,
-    color: COLORS.text.secondary,
-    textTransform: 'capitalize',
-  },
-  overdueText: { color: COLORS.error, fontWeight: FONTS.weights.semibold },
-  advisoryCard: {
-    borderLeftWidth: 4,
+  heroSub: { color: 'rgba(255,255,255,0.7)', fontSize: FONTS.sizes.xs },
+  heroSummary: {
+    flex: 1,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: RADIUS.md,
     padding: SPACING.md,
-    marginBottom: SPACING.sm,
   },
-  advisoryTitle: {
+  heroSummaryTitle: {
+    color: COLORS.text.inverse,
     fontSize: FONTS.sizes.md,
     fontWeight: FONTS.weights.semibold,
-    color: COLORS.text.primary,
-    marginBottom: 4,
   },
-  advisoryBody: { fontSize: FONTS.sizes.sm, color: COLORS.text.secondary, lineHeight: 20 },
+  heroSummaryBody: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: FONTS.sizes.xs,
+    lineHeight: 17,
+    marginTop: SPACING.xs,
+  },
+  scoreTrack: {
+    height: 7,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderRadius: RADIUS.full,
+    overflow: 'hidden',
+    marginTop: SPACING.lg,
+  },
+  scoreFill: { height: '100%', backgroundColor: COLORS.primaryLight, borderRadius: RADIUS.full },
+  statGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  statTile: {
+    width: '48%',
+    minHeight: 92,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: SPACING.md,
+  },
+  statMarker: { width: 20, height: 4, borderRadius: RADIUS.full, marginBottom: SPACING.sm },
+  statValue: { color: COLORS.text.primary, fontSize: FONTS.sizes.xxl, fontWeight: FONTS.weights.bold },
+  statLabel: { color: COLORS.text.secondary, fontSize: FONTS.sizes.xs, marginTop: 2 },
+  sectionHeader: { marginBottom: SPACING.sm },
+  sectionHeaderCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.md,
+  },
+  sectionTitle: {
+    color: COLORS.text.primary,
+    fontSize: FONTS.sizes.lg,
+    fontWeight: FONTS.weights.semibold,
+  },
+  sectionMeta: { color: COLORS.text.secondary, fontSize: FONTS.sizes.sm },
+  quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.md },
+  quickAction: {
+    width: '48%',
+    minHeight: 120,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  quickDot: { width: 10, height: 10, borderRadius: RADIUS.full, marginBottom: SPACING.sm },
+  quickTitle: { color: COLORS.text.primary, fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.semibold },
+  quickBody: { color: COLORS.text.secondary, fontSize: FONTS.sizes.xs, lineHeight: 17, marginTop: SPACING.xs },
+  panel: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  organRow: { marginBottom: SPACING.md },
+  organHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.xs },
+  organName: { color: COLORS.text.primary, fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.medium },
+  organScore: { color: COLORS.text.secondary, fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.semibold },
+  organTrack: { height: 8, backgroundColor: COLORS.divider, borderRadius: RADIUS.full, overflow: 'hidden' },
+  organFill: { height: '100%', borderRadius: RADIUS.full },
+  emptyBlock: { backgroundColor: COLORS.background, borderRadius: RADIUS.md, padding: SPACING.md },
+  emptyTitle: { color: COLORS.text.primary, fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.semibold },
+  emptyBody: { color: COLORS.text.secondary, fontSize: FONTS.sizes.sm, lineHeight: 20, marginTop: SPACING.xs },
+  adherenceBar: {
+    height: 7,
+    backgroundColor: COLORS.divider,
+    borderRadius: RADIUS.full,
+    overflow: 'hidden',
+    marginBottom: SPACING.md,
+  },
+  adherenceFill: { height: '100%', backgroundColor: COLORS.primary, borderRadius: RADIUS.full },
+  timelineRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingVertical: SPACING.sm },
+  timelineDot: { width: 9, height: 9, borderRadius: RADIUS.full, backgroundColor: COLORS.primary },
+  timelineDotAlert: { backgroundColor: COLORS.error },
+  timelineContent: { flex: 1 },
+  timelineTitle: { color: COLORS.text.primary, fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.semibold },
+  timelineBody: { color: COLORS.text.secondary, fontSize: FONTS.sizes.xs, marginTop: 2 },
+  timelineStatus: { color: COLORS.text.secondary, fontSize: FONTS.sizes.xs, textTransform: 'capitalize' },
+  timelineStatusAlert: { color: COLORS.error, fontWeight: FONTS.weights.semibold },
+  advisoryCard: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
+    marginBottom: SPACING.sm,
+  },
+  advisoryRail: { width: 4 },
+  advisoryContent: { flex: 1, padding: SPACING.md },
+  advisoryTitle: { color: COLORS.text.primary, fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.semibold },
+  advisoryBody: { color: COLORS.text.secondary, fontSize: FONTS.sizes.sm, lineHeight: 20, marginTop: SPACING.xs },
 });

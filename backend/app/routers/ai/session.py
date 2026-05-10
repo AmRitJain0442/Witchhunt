@@ -1,7 +1,7 @@
 """
-AI session router — main conversation endpoint powered by Claude.
+AI session router powered through OpenRouter.
 The client sends the decrypted .kutumb memory file + user message.
-Claude returns an AI response + structured memory patches.
+The configured OpenRouter model returns an AI response + structured memory patches.
 """
 import json
 import logging
@@ -9,10 +9,8 @@ import time
 import uuid
 from datetime import datetime, timezone
 
-from anthropic import AsyncAnthropic
 from fastapi import APIRouter
 
-from app.config import get_settings
 from app.dependencies import CurrentUserDep
 from app.models.session import (
     AIResponseContent,
@@ -22,12 +20,10 @@ from app.models.session import (
     TriggerEvaluateRequest,
     TriggerEvaluateResponse,
 )
+from app.services.openrouter_service import openrouter_chat
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-settings = get_settings()
-
-_client = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
 _CRISIS_TERMS = [
     "kill myself",
@@ -118,8 +114,8 @@ def _detect_crisis(message: str) -> bool:
 def _evaluate_triggers(memory_file: dict, patches: dict) -> list[FiredTrigger]:
     """
     Fast local trigger evaluation for vital_threshold triggers.
-    The full evaluation is done by Claude, but we re-check critical ones here
-    as a safety net in case Claude misses them.
+    The model evaluates triggers, but we re-check critical ones here as a
+    safety net in case the model misses them.
     """
     fired: list[FiredTrigger] = []
     triggers = memory_file.get("trigger_rules", [])
@@ -233,13 +229,13 @@ async def run_session(req: SessionRequest, current_user: CurrentUserDep):
         )
 
     try:
-        response = await _client.messages.create(
-            model="claude-sonnet-4-6",
+        raw = await openrouter_chat(
+            SYSTEM_PROMPT,
+            _build_user_prompt(req),
             max_tokens=3000,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": _build_user_prompt(req)}],
+            json_mode=True,
         )
-        raw = response.content[0].text.strip()
+        raw = raw.strip()
 
         # Strip markdown code fences if present
         if raw.startswith("```"):
@@ -249,7 +245,7 @@ async def run_session(req: SessionRequest, current_user: CurrentUserDep):
 
         result = json.loads(raw)
     except json.JSONDecodeError as e:
-        logger.error("Claude returned invalid JSON in session %s: %s", req.session_id, e)
+        logger.error("OpenRouter returned invalid JSON in session %s: %s", req.session_id, e)
         result = {
             "ai_response": {
                 "text": "I encountered an issue processing your request. Please try again.",
@@ -265,7 +261,7 @@ async def run_session(req: SessionRequest, current_user: CurrentUserDep):
             },
         }
     except Exception as e:
-        logger.error("Claude API error in session %s: %s", req.session_id, e)
+        logger.error("OpenRouter API error in session %s: %s", req.session_id, e)
         raise
 
     ai_resp = result.get("ai_response", {})
@@ -278,10 +274,10 @@ async def run_session(req: SessionRequest, current_user: CurrentUserDep):
     # Safety-net trigger evaluation
     extra_triggers = _evaluate_triggers(req.memory_file, patches)
 
-    # Merge Claude's trigger evaluations with our safety-net ones
-    claude_trigger_ids = {t.get("trigger_id") for t in patches.get("trigger_evaluations", [])}
+    # Merge model trigger evaluations with our safety-net ones
+    model_trigger_ids = {t.get("trigger_id") for t in patches.get("trigger_evaluations", [])}
     for t in extra_triggers:
-        if t.trigger_id not in claude_trigger_ids:
+        if t.trigger_id not in model_trigger_ids:
             patches.setdefault("trigger_evaluations", []).append({
                 "trigger_id": t.trigger_id,
                 "fired": True,

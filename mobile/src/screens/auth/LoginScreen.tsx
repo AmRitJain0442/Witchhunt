@@ -15,6 +15,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
 import { useAuth } from '../../store/AuthContext';
 import { COLORS, FONTS, SPACING, RADIUS } from '../../constants';
+import { auth, sendPasswordResetEmail } from '../../lib/firebase';
 
 type Props = { navigation: NativeStackNavigationProp<AuthStackParamList, 'Login'> };
 
@@ -22,6 +23,7 @@ export default function LoginScreen({ navigation }: Props) {
   const { signInWithEmail } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
@@ -36,6 +38,19 @@ export default function LoginScreen({ navigation }: Props) {
       Alert.alert('Login failed', err instanceof Error ? err.message : 'Check your credentials.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (!email.trim()) {
+      Alert.alert('Email required', 'Enter your email first, then request a reset link.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      Alert.alert('Reset link sent', 'Check your email for password reset instructions.');
+    } catch (err: unknown) {
+      Alert.alert('Could not send reset link', err instanceof Error ? err.message : 'Please try again.');
     }
   };
 
@@ -65,15 +80,24 @@ export default function LoginScreen({ navigation }: Props) {
           />
 
           <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Your password"
-            placeholderTextColor={COLORS.text.disabled}
-            secureTextEntry
-            autoComplete="password"
-          />
+          <View style={styles.passwordRow}>
+            <TextInput
+              style={styles.passwordInput}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Your password"
+              placeholderTextColor={COLORS.text.disabled}
+              secureTextEntry={!passwordVisible}
+              autoComplete="password"
+            />
+            <TouchableOpacity style={styles.passwordToggle} onPress={() => setPasswordVisible((visible) => !visible)}>
+              <Text style={styles.passwordToggleText}>{passwordVisible ? 'Hide' : 'Show'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity onPress={handlePasswordReset}>
+            <Text style={styles.forgotLink}>Forgot password?</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
             {loading ? (
@@ -97,8 +121,13 @@ export default function LoginScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  inner: { flexGrow: 1, justifyContent: 'center', padding: SPACING.xl },
-  header: { alignItems: 'center', marginBottom: SPACING.xxl },
+  inner: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: SPACING.xl,
+    paddingBottom: SPACING.xxl * 3,
+  },
+  header: { alignItems: 'center', marginBottom: SPACING.lg },
   logo: { fontSize: 56 },
   title: {
     fontSize: FONTS.sizes.xxxl,
@@ -126,6 +155,39 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     fontSize: FONTS.sizes.md,
     color: COLORS.text.primary,
+    marginBottom: SPACING.sm,
+  },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.xs,
+  },
+  passwordInput: {
+    flex: 1,
+    padding: SPACING.md,
+    fontSize: FONTS.sizes.md,
+    color: COLORS.text.primary,
+  },
+  passwordToggle: {
+    minWidth: 70,
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+    paddingRight: SPACING.sm,
+  },
+  passwordToggleText: {
+    color: COLORS.primary,
+    fontSize: FONTS.sizes.sm,
+    fontWeight: FONTS.weights.semibold,
+  },
+  forgotLink: {
+    color: COLORS.primary,
+    fontSize: FONTS.sizes.sm,
+    fontWeight: FONTS.weights.medium,
+    textAlign: 'right',
     marginBottom: SPACING.sm,
   },
   button: {

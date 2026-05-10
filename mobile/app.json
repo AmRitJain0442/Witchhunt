@@ -17,6 +17,11 @@
     },
     "android": {
       "package": "health.kutumb.app",
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ],
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#2D6A4F",
         "foregroundImage": "./assets/android-icon-foreground.png",

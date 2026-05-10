@@ -9,19 +9,15 @@ import { COLORS } from '../constants';
 import AuthNavigator from './AuthNavigator';
 import AppNavigator from './AppNavigator';
 
-// ── Onboarding (shown once after first sign-up) ────────────────────────────────
-import OnboardingScreen from '../screens/auth/OnboardingScreen';
-
 export type RootStackParamList = {
   Auth: undefined;
   App: undefined;
-  Onboarding: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
-  const { firebaseUser, appUser, isLoading } = useAuth();
+  const { firebaseUser, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -31,15 +27,11 @@ export default function RootNavigator() {
     );
   }
 
-  const isNewUser = firebaseUser && !appUser?.date_of_birth;
-
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!firebaseUser ? (
           <Stack.Screen name="Auth" component={AuthNavigator} />
-        ) : isNewUser ? (
-          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         ) : (
           <Stack.Screen name="App" component={AppNavigator} />
         )}

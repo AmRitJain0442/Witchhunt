@@ -5,11 +5,11 @@ import {
   ClipboardCheck,
   FileText,
   HeartPulse,
+  Leaf,
   LayoutDashboard,
   LogOut,
   NotebookText,
   Pill,
-  ShieldPlus,
   UsersRound,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -51,18 +51,18 @@ export default function Sidebar({ className, mobile = false, onNavigate }: Sideb
   return (
     <aside
       className={cn(
-        'h-screen w-60 shrink-0 flex-col border-r border-border bg-surface text-tx-1 shadow-sm',
+        'h-screen w-64 shrink-0 flex-col border-r border-border bg-surface/88 text-tx-1 shadow-[var(--shadow-md)] backdrop-blur-xl',
         mobile ? 'flex' : 'sticky top-0',
         className,
       )}
     >
       <div className="flex h-16 items-center gap-3 border-b border-border px-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent-muted text-accent">
-          <ShieldPlus size={21} strokeWidth={1.8} />
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-accent-text shadow-[var(--shadow-sm)]">
+          <Leaf size={20} strokeWidth={1.9} />
         </div>
         <div className="min-w-0">
-          <div className="text-sm font-semibold tracking-tight">Kutumb</div>
-          <div className="text-[10px] uppercase tracking-[0.2em] text-tx-3">Family health</div>
+          <div className="font-display text-[17px] font-semibold tracking-tight">Kutumb</div>
+          <div className="text-[10px] uppercase tracking-[0.22em] text-tx-3">Family care OS</div>
         </div>
       </div>
 
@@ -76,16 +76,16 @@ export default function Sidebar({ className, mobile = false, onNavigate }: Sideb
               onClick={onNavigate}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'focus-ring group flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-[13px] font-medium transition-all',
+                'focus-ring group flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-[13px] font-medium transition-all',
                 active
-                  ? 'border-accent/20 bg-accent-muted text-accent'
-                  : 'text-tx-2 hover:border-border hover:bg-bg-subtle hover:text-tx-1',
+                  ? 'border-gold/30 bg-accent text-accent-text shadow-[var(--shadow-sm)]'
+                  : 'border-transparent text-tx-2 hover:border-border hover:bg-bg-subtle hover:text-tx-1',
               )}
             >
               <Icon
                 size={17}
                 strokeWidth={1.8}
-                className={cn(active ? 'text-accent' : 'text-tx-3 group-hover:text-tx-2')}
+                className={cn(active ? 'text-accent-text' : 'text-tx-3 group-hover:text-tx-2')}
               />
               {label}
             </Link>
@@ -94,8 +94,8 @@ export default function Sidebar({ className, mobile = false, onNavigate }: Sideb
       </nav>
 
       <div className="border-t border-border p-3">
-        <div className="mb-2 flex items-center gap-2 rounded-xl border border-border bg-bg px-2.5 py-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent-muted text-[11px] font-semibold text-accent">
+        <div className="mb-2 flex items-center gap-2 rounded-2xl border border-border bg-bg px-2.5 py-2">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold/20 text-[11px] font-semibold text-gold">
             {initials}
           </div>
           <div className="min-w-0 flex-1">
@@ -107,7 +107,7 @@ export default function Sidebar({ className, mobile = false, onNavigate }: Sideb
         <button
           type="button"
           onClick={signOut}
-          className="focus-ring flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12px] text-tx-3 transition-colors hover:bg-bg-subtle hover:text-red"
+          className="focus-ring flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[12px] text-tx-3 transition-colors hover:bg-bg-subtle hover:text-red"
         >
           <LogOut size={15} strokeWidth={1.8} />
           Sign out

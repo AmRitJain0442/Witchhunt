@@ -23,6 +23,7 @@ export default function RegisterScreen({ navigation }: Props) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
@@ -81,15 +82,20 @@ export default function RegisterScreen({ navigation }: Props) {
           />
 
           <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Min. 6 characters"
-            placeholderTextColor={COLORS.text.disabled}
-            secureTextEntry
-            autoComplete="new-password"
-          />
+          <View style={styles.passwordRow}>
+            <TextInput
+              style={styles.passwordInput}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Min. 6 characters"
+              placeholderTextColor={COLORS.text.disabled}
+              secureTextEntry={!passwordVisible}
+              autoComplete="new-password"
+            />
+            <TouchableOpacity style={styles.passwordToggle} onPress={() => setPasswordVisible((visible) => !visible)}>
+              <Text style={styles.passwordToggleText}>{passwordVisible ? 'Hide' : 'Show'}</Text>
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
             {loading ? (
@@ -113,8 +119,13 @@ export default function RegisterScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  inner: { flexGrow: 1, justifyContent: 'center', padding: SPACING.xl },
-  header: { alignItems: 'center', marginBottom: SPACING.xxl },
+  inner: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: SPACING.xl,
+    paddingBottom: SPACING.xxl * 4,
+  },
+  header: { alignItems: 'center', marginBottom: SPACING.md },
   logo: { fontSize: 56 },
   title: {
     fontSize: FONTS.sizes.xxl,
@@ -143,6 +154,32 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.md,
     color: COLORS.text.primary,
     marginBottom: SPACING.sm,
+  },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+  },
+  passwordInput: {
+    flex: 1,
+    padding: SPACING.md,
+    fontSize: FONTS.sizes.md,
+    color: COLORS.text.primary,
+  },
+  passwordToggle: {
+    minWidth: 70,
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+    paddingRight: SPACING.sm,
+  },
+  passwordToggleText: {
+    color: COLORS.primary,
+    fontSize: FONTS.sizes.sm,
+    fontWeight: FONTS.weights.semibold,
   },
   button: {
     backgroundColor: COLORS.primary,

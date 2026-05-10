@@ -1,6 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, FONTS } from '../constants';
 
 import HomeScreen from '../screens/home/HomeScreen';
@@ -58,8 +59,13 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
 }
 
 export default function AppNavigator() {
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 32);
+
   return (
     <Tab.Navigator
+      initialRouteName="Home"
+      backBehavior="initialRoute"
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused }) => <TabIcon name={route.name} focused={focused} />,
         tabBarActiveTintColor: COLORS.primary,
@@ -67,8 +73,8 @@ export default function AppNavigator() {
         tabBarStyle: {
           backgroundColor: COLORS.surface,
           borderTopColor: COLORS.border,
-          paddingBottom: 4,
-          height: 64,
+          paddingBottom: bottomInset,
+          height: 64 + bottomInset,
         },
         tabBarLabelStyle: {
           fontSize: FONTS.sizes.xs,

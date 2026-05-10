@@ -2,7 +2,6 @@ import json
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from anthropic import AsyncAnthropic
 from google.cloud.firestore import AsyncClient
 
 from app.models.insights import (
@@ -22,8 +21,7 @@ from app.models.insights import (
     MedicineCabinetAuditResponse,
 )
 from app.services.health_context_service import build_health_context
-
-_anthropic_client = AsyncAnthropic()
+from app.services.openrouter_service import openrouter_chat
 
 SYSTEM_PROMPT = """You are a clinical health assistant AI for the Kutumb health app serving Indian families.
 You receive a structured HealthContext JSON containing the user's full medical profile.
@@ -43,7 +41,6 @@ HARD_CONTRAINDICATIONS: dict[str, list[str]] = {
     "low_energy": ["high_intensity"],
 }
 
-_MODEL = "claude-sonnet-4-6"
 _CACHE_TTL_HOURS = 24
 
 
@@ -83,18 +80,17 @@ async def _set_cached_insight(
     )
 
 
-async def _call_claude(system: str, user_message: str) -> str:
-    response = await _anthropic_client.messages.create(
-        model=_MODEL,
+async def _call_openrouter(system: str, user_message: str) -> str:
+    return await openrouter_chat(
+        system,
+        user_message,
         max_tokens=4096,
-        system=system,
-        messages=[{"role": "user", "content": user_message}],
+        json_mode=True,
     )
-    return response.content[0].text
 
 
 def _safe_parse_json(raw: str) -> dict:
-    """Attempt to parse JSON from Claude response; strip markdown fences if present."""
+    """Attempt to parse JSON from model response; strip markdown fences if present."""
     text = raw.strip()
     if text.startswith("```"):
         # Strip markdown code fences
@@ -161,7 +157,7 @@ Schema:
     now = datetime.now(timezone.utc)
     check_id = str(uuid4())
 
-    raw = await _call_claude(SYSTEM_PROMPT, prompt)
+    raw = await _call_openrouter(SYSTEM_PROMPT, prompt)
     parsed = _safe_parse_json(raw)
 
     if not parsed:
@@ -324,7 +320,7 @@ Schema:
 }}
 """
 
-    raw = await _call_claude(SYSTEM_PROMPT, prompt)
+    raw = await _call_openrouter(SYSTEM_PROMPT, prompt)
     parsed = _safe_parse_json(raw)
 
     if not parsed:
@@ -412,7 +408,7 @@ Schema:
 }}
 """
 
-    raw = await _call_claude(SYSTEM_PROMPT, prompt)
+    raw = await _call_openrouter(SYSTEM_PROMPT, prompt)
     parsed = _safe_parse_json(raw)
 
     if not parsed:
@@ -491,7 +487,7 @@ Schema:
 }}
 """
 
-    raw = await _call_claude(SYSTEM_PROMPT, prompt)
+    raw = await _call_openrouter(SYSTEM_PROMPT, prompt)
     parsed = _safe_parse_json(raw)
 
     if not parsed:
@@ -584,7 +580,7 @@ Schema:
 }}
 """
 
-    raw = await _call_claude(SYSTEM_PROMPT, prompt)
+    raw = await _call_openrouter(SYSTEM_PROMPT, prompt)
     parsed = _safe_parse_json(raw)
 
     if not parsed:

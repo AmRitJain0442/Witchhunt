@@ -5,10 +5,8 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from anthropic import AsyncAnthropic
 from fastapi import APIRouter
 
-from app.config import get_settings
 from app.dependencies import CurrentUserDep
 from app.models.session import (
     CompressRequest,
@@ -18,11 +16,10 @@ from app.models.session import (
     TriggerEvaluateResponse,
     ValidateResponse,
 )
+from app.services.openrouter_service import openrouter_chat
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-settings = get_settings()
-_client = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
 _REQUIRED_IDENTITY_FIELDS = ["display_name", "date_of_birth", "biological_sex", "height_cm", "weight_kg"]
 
@@ -50,13 +47,13 @@ async def compress_memory(req: CompressRequest, current_user: CurrentUserDep):
     )
 
     try:
-        response = await _client.messages.create(
-            model="claude-sonnet-4-6",
+        raw = await openrouter_chat(
+            COMPRESS_SYSTEM.format(keep=req.keep_recent_sessions),
+            prompt,
             max_tokens=1500,
-            system=COMPRESS_SYSTEM.format(keep=req.keep_recent_sessions),
-            messages=[{"role": "user", "content": prompt}],
+            json_mode=True,
         )
-        raw = response.content[0].text.strip()
+        raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):

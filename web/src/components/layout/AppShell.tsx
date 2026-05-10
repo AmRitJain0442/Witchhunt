@@ -1,6 +1,6 @@
 'use client';
 
-import { Menu, ShieldPlus, X } from 'lucide-react';
+import { Leaf, Menu, ShieldPlus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -18,11 +18,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg">
-        <div className="surface-panel rounded-2xl px-8 py-7 text-center">
-          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-accent-muted text-accent">
+        <div className="petal-card kolam-frame rounded-3xl px-8 py-7 text-center">
+          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-text">
             <ShieldPlus size={22} strokeWidth={1.8} />
           </div>
-          <div className="text-[11px] uppercase tracking-[0.24em] text-tx-3">Loading care space</div>
+          <div className="font-mono text-[11px] uppercase tracking-[0.24em] text-tx-3">Loading care space</div>
           <div className="mt-4 flex justify-center gap-1.5">
             {[0, 1, 2].map((i) => (
               <div
@@ -41,15 +41,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-bg text-tx-1 md:flex">
-      <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-surface/95 px-4 backdrop-blur md:hidden">
-        <div>
-          <div className="text-sm font-semibold tracking-tight">Kutumb</div>
-          <div className="text-[10px] uppercase tracking-[0.18em] text-tx-3">Family health</div>
+      <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-surface/90 px-4 shadow-[var(--shadow-sm)] backdrop-blur-xl md:hidden">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-accent-text">
+            <Leaf size={16} strokeWidth={1.9} />
+          </span>
+          <span>
+            <span className="block font-display text-[16px] font-semibold tracking-tight">Kutumb</span>
+            <span className="block text-[9px] uppercase tracking-[0.2em] text-tx-3">Family care OS</span>
+          </span>
         </div>
         <button
           type="button"
           onClick={() => setNavOpen(true)}
-          className="focus-ring flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-bg text-tx-2"
+          className="focus-ring flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-bg text-tx-2"
           aria-label="Open navigation"
         >
           <Menu size={19} strokeWidth={1.8} />
@@ -71,7 +76,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => setNavOpen(false)}
-              className="focus-ring absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-bg text-tx-2"
+              className="focus-ring absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-2xl border border-border bg-bg text-tx-2"
               aria-label="Close navigation"
             >
               <X size={18} strokeWidth={1.8} />
