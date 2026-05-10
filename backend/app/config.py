@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     # Firebase
     firebase_project_id: str
     firebase_service_account_key_path: str = "./serviceAccountKey.json"
+    firebase_service_account_json: str = ""
     firebase_storage_bucket: str
 
     # OpenRouter (LLM gateway)
