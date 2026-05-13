@@ -44,7 +44,7 @@ def verify_firebase_token(token: str) -> CurrentUser:
         return _token_cache[token]
 
     try:
-        decoded = auth.verify_id_token(token, check_revoked=True)
+        decoded = auth.verify_id_token(token, check_revoked=True, clock_skew_seconds=10)
     except auth.RevokedIdTokenError:
         raise UnauthorizedError("Token has been revoked. Please sign in again.")
     except auth.ExpiredIdTokenError:

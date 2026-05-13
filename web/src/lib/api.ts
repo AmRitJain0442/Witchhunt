@@ -175,6 +175,68 @@ function normalizeMember(raw: Record<string, unknown>) {
   };
 }
 
+function normalizeHealthScores(raw: Record<string, unknown>) {
+  const emptyOrgan = { score: 0, trend: 'stable', factors: [] as string[], recommendations: [] as string[] };
+  const organMap: Record<string, typeof emptyOrgan> = {};
+
+  if (Array.isArray(raw.organs)) {
+    for (const item of raw.organs) {
+      const organ = item as Record<string, unknown>;
+      const key = String(organ.organ ?? '');
+      if (!key) continue;
+      organMap[key] = {
+        score: Number(organ.score ?? 0),
+        trend: String(organ.trend ?? 'stable'),
+        factors: Array.isArray(organ.contributing_factors) ? organ.contributing_factors as string[] : [],
+        recommendations: Array.isArray(organ.recommendations) ? organ.recommendations as string[] : [],
+      };
+    }
+  } else if (raw.organs && typeof raw.organs === 'object') {
+    for (const [key, score] of Object.entries(raw.organs as Record<string, unknown>)) {
+      organMap[key] = { ...emptyOrgan, score: Number(score ?? 0) };
+    }
+  }
+
+  return {
+    ...raw,
+    overall: Number(raw.overall ?? raw.overall_score ?? 0),
+    computed_at: raw.computed_at ?? raw.score_date ?? new Date().toISOString(),
+    heart: organMap.heart ?? emptyOrgan,
+    brain: organMap.brain ?? emptyOrgan,
+    gut: organMap.gut ?? emptyOrgan,
+    lungs: organMap.lungs ?? emptyOrgan,
+  };
+}
+
+function normalizeLabReport(raw: Record<string, unknown>) {
+  const statusMap: Record<string, string> = {
+    parsed: 'completed',
+    uploaded: 'pending_ocr',
+  };
+  const biomarkersRaw = raw.biomarkers;
+  let biomarkers: Record<string, unknown> = {};
+
+  if (Array.isArray(biomarkersRaw)) {
+    biomarkers = Object.fromEntries(
+      biomarkersRaw
+        .map((item) => item as Record<string, unknown>)
+        .filter((item) => item.name)
+        .map((item) => [String(item.name), item.value]),
+    );
+  } else if (biomarkersRaw && typeof biomarkersRaw === 'object') {
+    biomarkers = biomarkersRaw as Record<string, unknown>;
+  }
+
+  const status = String(raw.status ?? '');
+  return {
+    ...raw,
+    id: raw.id ?? raw.report_id,
+    created_at: raw.created_at ?? raw.uploaded_at,
+    status: statusMap[status] ?? status,
+    biomarkers,
+  };
+}
+
 export const authApi = {
   register: (idToken: string, displayName?: string) =>
     api.post('/auth/register', { firebase_token: idToken, display_name: displayName }).then(r => normalizeAuth(r.data)),
@@ -192,7 +254,7 @@ export const userApi = {
 };
 
 export const healthApi = {
-  scores: () => api.get('/health/scores').then(r => r.data),
+  scores: () => api.get('/health/scores').then(r => normalizeHealthScores(r.data)),
   history: (days = 30) => api.get('/health/scores/history', { params: { period: `${days}d` } }).then(r => r.data),
 };
 
@@ -299,9 +361,12 @@ export const insightApi = {
 };
 
 export const labApi = {
-  list: (p?: unknown) => api.get('/lab_reports/', { params: p }).then(r => r.data),
-  upload: (fd: FormData) => api.post('/lab_reports/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data),
-  get: (id: string) => api.get(`/lab_reports/${id}`).then(r => r.data),
+  list: (p?: unknown) => api.get('/lab_reports/', { params: p }).then(r => ({
+    ...r.data,
+    reports: r.data.reports?.map((report: Record<string, unknown>) => normalizeLabReport(report)),
+  })),
+  upload: (fd: FormData) => api.post('/lab_reports/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => normalizeLabReport(r.data)),
+  get: (id: string) => api.get(`/lab_reports/${id}`).then(r => normalizeLabReport(r.data)),
   trends: (biomarker: string) => api.get('/lab_reports/biomarkers/trends', { params: { biomarker_name: biomarker } }).then(r => r.data),
 };
 

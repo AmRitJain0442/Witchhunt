@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Kutumb · Family Care OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#08080D;
+  --surf:#111118;
+  --surf2:#1A1A24;
+  --gold:#C9A53B;
+  --gs:rgba(201,165,59,.16);
+  --gg:rgba(201,165,59,.32);
+  --verm:#D4432A;
+  --vs:rgba(212,67,42,.16);
+  --teal:#0E9F8B;
+  --ts:rgba(14,159,139,.16);
+  --sky:#4B8EF5;
+  --ss:rgba(75,142,245,.14);
+  --tx1:#EFE8DC;
+  --tx2:#9B9080;
+  --tx3:#4E4740;
+  --bdr:rgba(201,165,59,.11);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);color:var(--tx1);font-family:'Inter',sans-serif;}
+
+.dot-grid{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:radial-gradient(circle,rgba(201,165,59,.065) 1px,transparent 1px);
+  background-size:30px 30px;}
+
+#cur{position:fixed;width:8px;height:8px;border-radius:50%;background:var(--gold);
+  pointer-events:none;z-index:9999;transform:translate(-50%,-50%);
+  box-shadow:0 0 12px var(--gg);}
+body{cursor:none;}
+
+/* ── SLIDE ENGINE ── */
+.deck{width:100vw;height:100vh;position:relative;}
+.slide{
+  position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;
+  opacity:0;pointer-events:none;
+  transition:opacity .5s cubic-bezier(.4,0,.2,1),transform .5s cubic-bezier(.4,0,.2,1);
+  transform:translateY(18px);
+  padding:64px 120px;
+}
+.slide.active{opacity:1;pointer-events:all;transform:translateY(0);}
+.slide.exit{opacity:0;transform:translateY(-18px);transition:opacity .32s,transform .32s;}
+
+/* ── NAV ── */
+#nav{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:8px;z-index:100;
+  background:rgba(8,8,13,.8);border:1px solid var(--bdr);border-radius:99px;
+  padding:8px 16px;backdrop-filter:blur(16px);}
+.nd{width:6px;height:6px;border-radius:50%;background:var(--tx3);cursor:pointer;transition:all .3s;}
+.nd.on{background:var(--gold);width:20px;border-radius:3px;}
+#ctr{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--tx3);letter-spacing:.2em;margin-left:10px;}
+
+.arr{position:fixed;top:50%;transform:translateY(-50%);z-index:100;
+  background:transparent;border:1px solid var(--bdr);border-radius:50%;
+  width:44px;height:44px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;color:var(--tx3);transition:all .2s;}
+.arr:hover{border-color:var(--gold);color:var(--gold);}
+#ap{left:20px;}#an{right:20px;}
+
+/* ── TYPE SCALE ── */
+.disp{font-family:'Cormorant Garamond',serif;}
+.mono{font-family:'JetBrains Mono',monospace;}
+
+/* eyebrow label */
+.eye{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;
+  letter-spacing:.28em;text-transform:uppercase;color:var(--gold);}
+
+/* ── UTIL ── */
+.pill{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border-radius:99px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;
+  letter-spacing:.18em;text-transform:uppercase;}
+.pg{background:var(--gs);color:var(--gold);border:1px solid rgba(201,165,59,.25);}
+.pr{background:var(--vs);color:var(--verm);border:1px solid rgba(212,67,42,.25);}
+.pt{background:var(--ts);color:var(--teal);border:1px solid rgba(14,159,139,.25);}
+.ps{background:var(--ss);color:var(--sky);border:1px solid rgba(75,142,245,.22);}
+
+.card{background:var(--surf);border:1px solid var(--bdr);border-radius:22px;}
+.rule{height:1px;background:linear-gradient(90deg,transparent,var(--bdr),transparent);}
+.prog{height:7px;border-radius:99px;background:var(--surf2);overflow:hidden;}
+.fill{height:100%;border-radius:99px;}
+
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.bob{animation:bob 4s ease-in-out infinite;}
+.pulse{animation:pulse 2.2s ease-in-out infinite;}
+
+/* ── LAYOUT HELPERS ── */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:start;width:100%;}
+.two-c{display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:center;width:100%;}
+.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;width:100%;}
+
+/* heading sizes */
+.h-hero{font-family:'Cormorant Garamond',serif;font-size:120px;font-weight:500;
+  line-height:.9;letter-spacing:-.02em;}
+.h-xl{font-family:'Cormorant Garamond',serif;font-size:86px;font-weight:500;
+  line-height:.96;letter-spacing:-.02em;}
+.h-lg{font-family:'Cormorant Garamond',serif;font-size:72px;font-weight:500;
+  line-height:.98;letter-spacing:-.02em;}
+.h-md{font-family:'Cormorant Garamond',serif;font-size:58px;font-weight:500;
+  line-height:1.0;letter-spacing:-.015em;}
+.body-lg{font-size:20px;color:var(--tx2);line-height:1.75;}
+.body-md{font-size:17px;color:var(--tx2);line-height:1.8;}
+.body-sm{font-size:15px;color:var(--tx2);line-height:1.75;}
+
+/* stat large */
+.stat-v{font-family:'Cormorant Garamond',serif;font-size:80px;font-weight:500;line-height:1;}
+.stat-l{font-size:14px;text-transform:uppercase;letter-spacing:.18em;color:var(--tx3);margin-top:6px;}
+
+/* card variants */
+.fc{background:var(--surf);border:1px solid var(--bdr);border-radius:22px;padding:32px 36px;}
+.fc-tinted{border-radius:22px;padding:32px 36px;}
+
+/* phone mockup */
+.phone{width:260px;border-radius:42px;border:2px solid rgba(255,255,255,.07);overflow:hidden;
+  box-shadow:0 48px 100px rgba(0,0,0,.72),0 0 0 1px rgba(255,255,255,.04);}
+.phone img{width:100%;display:block;}
+
+/* feature icon */
+.ficon{width:56px;height:56px;border-radius:16px;display:flex;align-items:center;
+  justify-content:center;font-size:26px;margin-bottom:20px;}
+
+/* signal card row */
+.sc{display:grid;grid-template-columns:12px 1fr auto auto;align-items:center;
+  gap:18px;border-radius:16px;padding:16px 20px;border:1px solid;}
+
+/* tech pill */
+.tpill{display:flex;align-items:center;gap:14px;padding:16px 20px;
+  background:var(--surf);border:1px solid var(--bdr);border-radius:16px;margin-bottom:12px;}
+</style>
+</head>
+<body>
+<div id="cur"></div>
+<div class="dot-grid"></div>
+
+<!-- BACKGROUND RANGOLI -->
+<svg style="position:fixed;right:-60px;top:-60px;width:560px;height:560px;opacity:.05;pointer-events:none;z-index:0;" viewBox="0 0 560 560" fill="none">
+  <g transform="translate(280,280)">
+    <circle r="240" fill="none" stroke="#C9A53B" stroke-width="1" stroke-dasharray="4 9"/>
+    <circle r="175" fill="none" stroke="#C9A53B" stroke-width=".6" stroke-dasharray="2 6"/>
+    <circle r="110" fill="none" stroke="#D4432A" stroke-width=".6" stroke-dasharray="3 5"/>
+    <circle r="52" fill="none" stroke="#C9A53B" stroke-width="1.2"/>
+    <line x1="-240" y1="0" x2="240" y2="0" stroke="#C9A53B" stroke-width=".5" opacity=".5"/>
+    <line x1="0" y1="-240" x2="0" y2="240" stroke="#C9A53B" stroke-width=".5" opacity=".5"/>
+    <line x1="-170" y1="-170" x2="170" y2="170" stroke="#C9A53B" stroke-width=".4" opacity=".35"/>
+    <line x1="170" y1="-170" x2="-170" y2="170" stroke="#C9A53B" stroke-width=".4" opacity=".35"/>
+    <g style="animation:spin 48s linear infinite;transform-origin:0 0">
+      <polygon points="0,-200 10,-193 0,-186 -10,-193" fill="#C9A53B" opacity=".6"/>
+      <polygon points="200,0 193,10 186,0 193,-10" fill="#C9A53B" opacity=".6"/>
+      <polygon points="0,200 10,193 0,186 -10,193" fill="#C9A53B" opacity=".6"/>
+      <polygon points="-200,0 -193,10 -186,0 -193,-10" fill="#C9A53B" opacity=".6"/>
+      <polygon points="-141,-141 -135,-149 -127,-141 -135,-133" fill="#D4432A" opacity=".55"/>
+      <polygon points="141,-141 149,-135 141,-127 133,-135" fill="#D4432A" opacity=".55"/>
+      <polygon points="141,141 135,149 127,141 135,133" fill="#D4432A" opacity=".55"/>
+      <polygon points="-141,141 -149,135 -141,127 -133,135" fill="#D4432A" opacity=".55"/>
+    </g>
+  </g>
+</svg>
+
+<div class="deck">
+
+<!-- ══════════════════════════════════════
+     S1 · COVER
+══════════════════════════════════════ -->
+<div class="slide active" style="align-items:center;text-align:center;justify-content:center;gap:0;">
+  <div style="width:88px;height:88px;border-radius:50%;background:linear-gradient(145deg,#2A5C3F,#153324);display:flex;align-items:center;justify-content:center;margin:0 auto 32px;box-shadow:0 0 0 1px rgba(201,165,59,.32),0 0 60px rgba(201,165,59,.14);">
+    <svg width="44" height="44" viewBox="0 0 44 44" fill="none"><path d="M22 8c-4.5 0-10 3.5-10 9 0 4.5 2.5 7 6 10l4 4.5 4-4.5c3.5-3 6-5.5 6-10 0-5.5-5.5-9-10-9z" fill="#4ADE80"/><path d="M14 23c-3.5 2-8 6-8 10.5s3.5 9 8 10" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round"/><path d="M30 23c3.5 2 8 6 8 10.5s-3.5 9-8 10" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round"/><path d="M22 43v-8" stroke="#4ADE80" stroke-width="1.8" stroke-linecap="round"/></svg>
+  </div>
+
+  <div class="eye" style="margin-bottom:20px;">✦ &nbsp;Private care memory for Indian families</div>
+
+  <div class="h-hero" style="margin-bottom:24px;">
+    <span style="color:var(--tx1);">कुटुंब</span><br/>
+    <span style="color:var(--gold);">Kutumb</span>
+  </div>
+
+  <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:26px;color:var(--tx2);max-width:640px;line-height:1.6;margin-bottom:44px;">
+    The family care OS that turns daily check-ins, medicines, lab reports, and AI conversations into a single shared health record.
+  </p>
+
+  <div style="display:flex;align-items:center;justify-content:center;gap:12px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--tx3);margin-bottom:56px;">
+    <span>Voice-First</span>
+    <span style="width:4px;height:4px;border-radius:50%;background:var(--gold);"></span>
+    <span>AI-Powered</span>
+    <span style="width:4px;height:4px;border-radius:50%;background:var(--gold);"></span>
+    <span>Privacy by Architecture</span>
+    <span style="width:4px;height:4px;border-radius:50%;background:var(--gold);"></span>
+    <span>Built for India</span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;width:540px;margin:0 auto;">
+    <div style="padding:0 28px;border-left:2px solid rgba(201,165,59,.28);">
+      <div class="stat-v" style="color:var(--gold);">18M</div>
+      <div class="stat-l">Diaspora caregivers</div>
+    </div>
+    <div style="padding:0 28px;border-left:2px solid rgba(212,67,42,.28);">
+      <div class="stat-v" style="color:var(--verm);">$300B</div>
+      <div class="stat-l">Adherence cost / yr</div>
+    </div>
+    <div style="padding:0 28px;border-left:2px solid rgba(14,159,139,.28);">
+      <div class="stat-v" style="color:var(--teal);">6+</div>
+      <div class="stat-l">Indic languages</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S2 · PROBLEM — THE QUOTE
+══════════════════════════════════════ -->
+<div class="slide">
+  <div class="eye" style="margin-bottom:24px;">✦ &nbsp;The broken loop</div>
+  <div class="two-c" style="gap:80px;">
+    <div>
+      <div class="h-xl" style="margin-bottom:28px;">Three lies.<br/>Thirty seconds.</div>
+      <div style="border-left:4px solid var(--verm);padding-left:28px;margin-bottom:32px;">
+        <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:28px;color:var(--tx2);line-height:1.7;">
+          "Khaana khaaya?" <span style="color:var(--verm);font-style:normal;">Haan.</span><br/>
+          "Tabiyat theek hai?" <span style="color:var(--verm);font-style:normal;">Bilkul.</span><br/>
+          "Dawai li?" <span style="color:var(--verm);font-style:normal;">Le li.</span>
+        </p>
+      </div>
+      <p class="body-lg" style="max-width:480px;">
+        Not because parents want to lie — but because they can't articulate <em style="color:var(--tx1);">"my left chest feels heavy when I climb stairs"</em> on a WhatsApp call. The doctor is 30 km away. The trip itself is exhausting.
+      </p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:20px;">
+      <div style="padding:32px 36px;border-radius:22px;background:var(--vs);border:1px solid rgba(212,67,42,.28);">
+        <div class="eye" style="color:var(--verm);margin-bottom:16px;">The patient</div>
+        <p class="body-md">Symptom illiteracy in clinical language — a 68-year-old farmer says <em>"paer mein jalan"</em> not "intermittent claudication." That gap is where diagnoses die.</p>
+      </div>
+      <div style="padding:32px 36px;border-radius:22px;background:var(--gs);border:1px solid rgba(201,165,59,.25);">
+        <div class="eye" style="color:var(--gold);margin-bottom:16px;">The family</div>
+        <p class="body-md">18 million Indians abroad. "Surprise emergency flights" cost ₹80k–₹2L each. Almost always preventable with earlier signal.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S3 · PROBLEM — THE SYSTEM
+══════════════════════════════════════ -->
+<div class="slide">
+  <div class="eye" style="margin-bottom:24px;">✦ &nbsp;The broken loop · continued</div>
+  <div class="h-lg" style="margin-bottom:36px;">The system is<br/>working against everyone.</div>
+  <div class="three">
+    <div class="fc">
+      <div class="ficon" style="background:var(--vs);color:var(--verm);">🔴</div>
+      <div style="font-size:20px;font-weight:600;margin-bottom:14px;color:var(--tx1);">Silent non-adherence</div>
+      <p class="body-md">Patients don't say "I stopped my BP meds because they made me dizzy" — they just stop. Six months later: a stroke. Costs <strong style="color:var(--verm);">$300B / year globally.</strong></p>
+    </div>
+    <div class="fc">
+      <div class="ficon" style="background:var(--gs);color:var(--gold);">🟡</div>
+      <div style="font-size:20px;font-weight:600;margin-bottom:14px;color:var(--tx1);">10-minute snapshots</div>
+      <p class="body-md">A consultation cannot reconstruct 6 months of symptoms. Doctors guess from incomplete narratives. Wrong referrals cost money and the patient time.</p>
+    </div>
+    <div class="fc">
+      <div class="ficon" style="background:var(--ts);color:var(--teal);">🔵</div>
+      <div style="font-size:20px;font-weight:600;margin-bottom:14px;color:var(--tx1);">Fragmented records</div>
+      <p class="body-md">ASHA workers manage 200+ families on paper notebooks. Patient data lives across 8 disconnected silos, owned by none of them.</p>
+    </div>
+  </div>
+  <div style="margin-top:36px;padding:28px 36px;border:1px solid var(--bdr);border-radius:22px;background:var(--surf);display:flex;align-items:center;gap:28px;">
+    <div class="disp" style="font-size:72px;font-weight:500;color:var(--verm);line-height:1;white-space:nowrap;">125,000</div>
+    <p class="body-lg" style="color:var(--tx2);">Preventable deaths per year in the US alone — directly attributable to medicine non-adherence. Not a developing-world problem. A human problem.</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S4 · SOLUTION OVERVIEW
+══════════════════════════════════════ -->
+<div class="slide">
+  <div class="eye" style="margin-bottom:20px;">✦ &nbsp;The solution</div>
+  <div class="two-c" style="gap:80px;align-items:start;">
+    <div>
+      <div class="h-lg" style="margin-bottom:24px;">One home.<br/>One health<br/>pattern.</div>
+      <p class="body-lg" style="max-width:460px;margin-bottom:32px;">
+        Kutumb is the <strong style="color:var(--tx1);">layer underneath telemedicine</strong> — the daily, ambient, voice-first companion that catches deterioration months before a crisis.
+      </p>
+      <p class="body-md" style="color:var(--tx3);max-width:440px;">We're not building a doctor replacement. We're building the <strong style="color:var(--tx2);">memory and the messenger</strong> between three people who currently don't talk to each other in any structured way.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div style="display:flex;align-items:center;gap:20px;padding:24px 28px;background:var(--surf);border-radius:18px;border:1px solid var(--bdr);">
+        <span style="font-size:32px;">🎙</span>
+        <div><div style="font-size:20px;font-weight:600;margin-bottom:6px;">Voice Check-ins</div><div class="body-sm">Hindi, Tamil, English or quick taps — all become structured care events.</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:20px;padding:24px 28px;background:var(--surf);border-radius:18px;border:1px solid var(--bdr);">
+        <span style="font-size:32px;">💊</span>
+        <div><div style="font-size:20px;font-weight:600;margin-bottom:6px;">Medicine Cabinet</div><div class="body-sm">Dose schedules, prescription OCR, missed-dose flags, family escalation.</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:20px;padding:24px 28px;background:var(--surf);border-radius:18px;border:1px solid var(--bdr);">
+        <span style="font-size:32px;">🧪</span>
+        <div><div style="font-size:20px;font-weight:600;margin-bottom:6px;">Lab Report Memory</div><div class="body-sm">Upload once. Biomarkers extracted, abnormals flagged, trends tracked.</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:20px;padding:24px 28px;background:var(--surf);border-radius:18px;border:1px solid var(--bdr);">
+        <span style="font-size:32px;">🤖</span>
+        <div><div style="font-size:20px;font-weight:600;margin-bottom:6px;">Care-Aware AI</div><div class="body-sm">Claude answers with the full family context already loaded.</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:20px;padding:24px 28px;background:var(--surf);border-radius:18px;border:1px solid var(--bdr);">
+        <span style="font-size:32px;">🚨</span>
+        <div><div style="font-size:20px;font-weight:600;margin-bottom:6px;">SOS Doctor Handoff</div><div class="body-sm">7-day clinical context as a doctor-ready PDF, one tap.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S5 · DAILY LOOP
+══════════════════════════════════════ -->
+<div class="slide">
+  <div class="eye" style="margin-bottom:20px;">✦ &nbsp;How it works · daily loop</div>
+  <div class="h-lg" style="margin-bottom:48px;">Three steps.<br/>Every single day.</div>
+  <div style="display:grid;grid-template-columns:1fr 2px 1fr 2px 1fr;gap:0;width:100%;">
+    <div style="padding-right:48px;">
+      <div class="mono" style="font-size:12px;letter-spacing:.3em;color:var(--tx3);text-transform:uppercase;margin-bottom:12px;">Step 01</div>
+      <div class="disp" style="font-size:80px;font-weight:400;color:var(--gold);line-height:1;margin-bottom:12px;">Capture</div>
+      <div style="width:48px;height:3px;background:var(--gold);margin-bottom:20px;"></div>
+      <div style="font-size:21px;font-weight:600;margin-bottom:14px;">The day's signals</div>
+      <p class="body-md">Voice recording in any Indic language. Photo of a prescription. Wearable HR / SpO₂. Quick tap on pain scale. All land as structured events in the timeline.</p>
+      <div style="margin-top:24px;display:flex;flex-direction:column;gap:10px;">
+        <span class="pill pg">🎙 Voice NLP</span>
+        <span class="pill pt">📸 OCR Vision</span>
+        <span class="pill pg">⌚ Wearables</span>
+      </div>
+    </div>
+    <div style="background:linear-gradient(to bottom,transparent,var(--bdr),transparent);margin:0;"></div>
+    <div style="padding:0 48px;">
+      <div class="mono" style="font-size:12px;letter-spacing:.3em;color:var(--tx3);text-transform:uppercase;margin-bottom:12px;">Step 02</div>
+      <div class="disp" style="font-size:80px;font-weight:400;color:var(--verm);line-height:1;margin-bottom:12px;">Read</div>
+      <div style="width:48px;height:3px;background:var(--verm);margin-bottom:20px;"></div>
+      <div style="font-size:21px;font-weight:600;margin-bottom:14px;">The pattern</div>
+      <p class="body-md">Organ scores (Heart · Brain · Gut · Lungs, each 0–100) make slow changes visible before they become urgent. Hard rules fire instantly. Claude surfaces trend alerts.</p>
+      <div style="margin-top:24px;display:flex;flex-direction:column;gap:10px;">
+        <span class="pill pr">❤️ Organ Scores</span>
+        <span class="pill pt">🤖 Claude AI</span>
+        <span class="pill pg">⚡ Hard Rules</span>
+      </div>
+    </div>
+    <div style="background:linear-gradient(to bottom,transparent,var(--bdr),transparent);margin:0;"></div>
+    <div style="padding-left:48px;">
+      <div class="mono" style="font-size:12px;letter-spacing:.3em;color:var(--tx3);text-transform:uppercase;margin-bottom:12px;">Step 03</div>
+      <div class="disp" style="font-size:80px;font-weight:400;color:var(--teal);line-height:1;margin-bottom:12px;">Act</div>
+      <div style="width:48px;height:3px;background:var(--teal);margin-bottom:20px;"></div>
+      <div style="font-size:21px;font-weight:600;margin-bottom:14px;">As a family</div>
+      <p class="body-md">The right person gets the right nudge with enough context to respond. Missed cardiac dose → family escalation. Critical lab → SOS packet auto-generated.</p>
+      <div style="margin-top:24px;display:flex;flex-direction:column;gap:10px;">
+        <span class="pill pr">🚨 SOS Escalation</span>
+        <span class="pill pg">🔔 Smart Nudges</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S6 · ORGAN SCORES
+══════════════════════════════════════ -->
+<div class="slide">
+  <div class="eye" style="margin-bottom:20px;">✦ &nbsp;Organ rangoli · स्वास्थ्य</div>
+  <div class="two-c" style="gap:80px;">
+    <div>
+      <div class="h-lg" style="margin-bottom:24px;">Four organs.<br/>One family<br/>wheel.</div>
+      <p class="body-lg" style="max-width:460px;margin-bottom:32px;">Each organ score (0–100) is computed daily from check-ins, wearables, lab values, and medicine adherence. The petal extends when you improve.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:28px;">
+        <div class="card" style="padding:18px 22px;"><div class="eye" style="color:var(--tx3);font-size:11px;margin-bottom:8px;">Heart · हृदय</div><div class="body-sm">HR, BP, stress markers, cardiac symptoms</div></div>
+        <div class="card" style="padding:18px 22px;"><div class="eye" style="color:var(--tx3);font-size:11px;margin-bottom:8px;">Brain · मस्तिष्क</div><div class="body-sm">Sleep hours, quality, stress level</div></div>
+        <div class="card" style="padding:18px 22px;"><div class="eye" style="color:var(--tx3);font-size:11px;margin-bottom:8px;">Gut · जठर</div><div class="body-sm">Bowel, hydration, meal regularity</div></div>
+        <div class="card" style="padding:18px 22px;"><div class="eye" style="color:var(--tx3);font-size:11px;margin-bottom:8px;">Lungs · फुफ्फुस</div><div class="body-sm">SpO₂, respiratory symptoms, steps</div></div>
+      </div>
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;gap:20px;border-radius:18px;padding:22px 26px;margin-bottom:16px;background:var(--vs);border:1px solid rgba(212,67,42,.3);">
+        <svg width="44" height="44" viewBox="0 0 44 44"><path d="M22 9c-4.5-4.5-13-2.5-14 9 0 6 2.5 8.5 8 14l6 7 6-7c5.5-5.5 8-8 8-14C36 6.5 26.5 4.5 22 9z" fill="none" stroke="#D4432A" stroke-width="1.8"/></svg>
+        <div style="flex:1;"><div class="eye" style="color:var(--verm);margin-bottom:8px;">Heart · हृदय</div><div class="prog"><div class="fill" style="width:84%;background:var(--verm);"></div></div></div>
+        <div class="disp" style="font-size:64px;font-weight:500;color:var(--verm);line-height:1;">84</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:20px;border-radius:18px;padding:22px 26px;margin-bottom:16px;background:var(--ts);border:1px solid rgba(14,159,139,.3);">
+        <svg width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="19" r="12" fill="none" stroke="#0E9F8B" stroke-width="1.8"/><path d="M16 28l3.5 9M28 28l-3.5 9" stroke="#0E9F8B" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <div style="flex:1;"><div class="eye" style="color:var(--teal);margin-bottom:8px;">Brain · मस्तिष्क</div><div class="prog"><div class="fill" style="width:78%;background:var(--teal);"></div></div></div>
+        <div class="disp" style="font-size:64px;font-weight:500;color:var(--teal);line-height:1;">78</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:20px;border-radius:18px;padding:22px 26px;margin-bottom:16px;background:var(--gs);border:1px solid rgba(201,165,59,.3);">
+        <svg width="44" height="44" viewBox="0 0 44 44"><path d="M12 16c0 0 2 16 10 16s10-16 10-16" fill="none" stroke="#C9A53B" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <div style="flex:1;"><div class="eye" style="color:var(--gold);margin-bottom:8px;">Gut · जठर</div><div class="prog"><div class="fill" style="width:72%;background:var(--gold);"></div></div></div>
+        <div class="disp" style="font-size:64px;font-weight:500;color:var(--gold);line-height:1;">72</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:20px;border-radius:18px;padding:22px 26px;background:var(--ss);border:1px solid rgba(75,142,245,.3);">
+        <svg width="44" height="44" viewBox="0 0 44 44"><path d="M22 10v6M14 16c-4 3-6 7-6 9 0 6 6 12 14 12s14-6 14-12c0-2-2-6-6-9" fill="none" stroke="#4B8EF5" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <div style="flex:1;"><div class="eye" style="color:var(--sky);margin-bottom:8px;">Lungs · फुफ्फुस</div><div class="prog"><div class="fill" style="width:88%;background:var(--sky);"></div></div></div>
+        <div class="disp" style="font-size:64px;font-weight:500;color:var(--sky);line-height:1;">88</div>
+      </div>
+      <div style="text-align:center;padding:20px;border:1px solid var(--bdr);border-radius:18px;background:var(--surf);margin-top:16px;">
+        <div class="eye" style="margin-bottom:8px;">Overall · आज</div>
+        <div class="disp" style="font-size:76px;font-weight:500;color:var(--gold);line-height:1.05;">80<span style="font-size:32px;color:var(--tx3);">/100</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S7 · VOICE AI
+══════════════════════════════════════ -->
+<div class="slide">
+  <div class="eye" style="margin-bottom:20px;">✦ &nbsp;Voice-first NLP engine</div>
+  <div class="two-c" style="gap:80px;">
+    <div>
+      <div class="h-lg" style="margin-bottom:24px;">Speak your<br/>language.<br/>Any of them.</div>
+      <p class="body-lg" style="max-width:460px;margin-bottom:32px;">Rural Indian speech is almost never monolingual. <em style="color:var(--tx1);">"Doctor saab ne medicine de di, but pet mein abhi bhi pain hai"</em> must parse as one utterance, not three failed transcriptions.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;">
+        <span class="pill pg">Hindi</span><span class="pill pg">Tamil</span><span class="pill pg">Telugu</span>
+        <span class="pill pg">Bengali</span><span class="pill pg">Marathi</span><span class="pill pg">Gujarati</span>
+        <span class="pill pt">Kannada</span><span class="pill pt">+ 4 more</span>
+      </div>
+    </div>
+    <div>
+      <div class="fc" style="margin-bottom:16px;">
+        <div class="eye" style="color:var(--gold);margin-bottom:12px;">Primary: Bhashini ASR</div>
+        <p class="body-md">11 Indic languages · Government-backed · Healthcare domain phrase models · Free for non-commercial use</p>
+      </div>
+      <div class="fc" style="margin-bottom:16px;">
+        <div class="eye" style="color:var(--teal);margin-bottom:12px;">Fallback: Whisper large-v3</div>
+        <p class="body-md">Open weights · On-device TFLite · Works fully offline on 2G</p>
+      </div>
+      <div class="fc" style="margin-bottom:24px;">
+        <div class="eye" style="color:var(--verm);margin-bottom:12px;">Voice Biomarker Layer</div>
+        <p class="body-md">Pitch variance · Speech rate · Pause distribution → Distress score 0–1. Catches the lying "I'm fine."</p>
+      </div>
+      <!-- mini chat -->
+      <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:14px;">
+        <div style="display:flex;align-items:flex-start;gap:12px;">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--surf);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;">👴</div>
+          <div style="background:var(--surf);border-radius:0 14px 14px 14px;padding:12px 16px;">
+            <div style="font-size:16px;color:var(--tx1);">Seene mein thodi bhaari feeling hai</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:12px;justify-content:flex-end;">
+          <div style="background:rgba(14,159,139,.12);border:1px solid rgba(14,159,139,.22);border-radius:14px 0 14px 14px;padding:12px 16px;max-width:320px;">
+            <div class="eye" style="color:var(--teal);font-size:10px;margin-bottom:6px;">Kutumb AI</div>
+            <div style="font-size:15px;color:var(--tx1);line-height:1.6;">I see you've logged chest tightness twice this week. Your BP was 142/88 yesterday. Given your Amlodipine, I'd recommend a doctor visit if this continues.</div>
+          </div>
+          <div style="width:36px;height:36px;border-radius:50%;background:rgba(14,159,139,.18);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;">🤖</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S8 · MEDICINE SAFETY — RULES
+══════════════════════════════════════ -->
+<div class="slide">
+  <div class="eye" style="margin-bottom:20px;">✦ &nbsp;Medicine safety · clinical guardrails</div>
+  <div class="two-c" style="gap:80px;">
+    <div>
+      <div class="h-lg" style="margin-bottom:24px;">Hard rules<br/>that can't<br/>be overridden.</div>
+      <p class="body-lg" style="max-width:460px;margin-bottom:32px;">Safety events are product behavior, not decoration. These checks fire deterministically — before Claude even sees the request.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <span class="pill pg">11 prescription categories</span>
+        <span class="pill pt">10 OTC / emergency categories</span>
+      </div>
+    </div>
+    <div>
+      <div style="background:var(--surf2);border:1px solid var(--bdr);border-radius:18px;padding:28px 32px;font-family:'JetBrains Mono',monospace;font-size:15px;line-height:2.1;">
+        <div style="color:var(--tx3);margin-bottom:8px;">// Fires instantly, before AI answers</div>
+        <div><span style="color:var(--teal);">SpO₂</span> &lt; 88% &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ <span style="color:var(--gold);">SOS trigger</span></div>
+        <div><span style="color:var(--teal);">Blood glucose</span> &gt; 300 &nbsp;→ <span style="color:var(--gold);">Emergency push</span></div>
+        <div><span style="color:var(--teal);">Systolic BP</span> &gt; 180 &nbsp;&nbsp;&nbsp;→ <span style="color:var(--gold);">Crisis flow</span></div>
+        <div><span style="color:var(--teal);">NSAID + GI allergy</span> &nbsp;→ <span style="color:var(--gold);">Block + doctor confirm</span></div>
+        <div><span style="color:var(--teal);">3 missed cardiac</span> &nbsp;&nbsp;&nbsp;→ <span style="color:var(--gold);">Family escalation</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S9 · MEDICINE SAFETY — DOSE BOARD
+══════════════════════════════════════ -->
+<div class="slide">
+  <div class="eye" style="margin-bottom:20px;">✦ &nbsp;Medicine cabinet · daily board</div>
+  <div class="two-c" style="gap:80px;">
+    <div>
+      <div class="h-lg" style="margin-bottom:24px;">Every dose.<br/>Every family<br/>member.</div>
+      <p class="body-lg" style="max-width:420px;margin-bottom:32px;">Dose schedules, refill windows, prescription OCR evidence. The whole family's medicine timeline in one view.</p>
+      <div style="padding:24px 28px;background:var(--gs);border:1px solid rgba(201,165,59,.22);border-radius:18px;">
+        <div class="eye" style="margin-bottom:12px;">Adherence today</div>
+        <div class="disp" style="font-size:72px;font-weight:500;color:var(--gold);line-height:1;margin-bottom:12px;">75%</div>
+        <div class="prog" style="height:10px;"><div class="fill" style="width:75%;background:linear-gradient(90deg,var(--gold),var(--teal));"></div></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="sc" style="border-color:rgba(201,165,59,.32);background:rgba(201,165,59,.08);">
+        <div style="width:10px;height:10px;border-radius:50%;background:var(--gold);box-shadow:0 0 10px var(--gold);"></div>
+        <div><div style="font-size:17px;font-weight:500;">Metformin 500mg</div><div class="mono" style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.15em;">with breakfast · Papa</div></div>
+        <span class="mono" style="font-size:14px;color:var(--tx2);">08:00</span>
+        <span style="background:rgba(201,165,59,.2);color:var(--gold);font-size:11px;padding:5px 14px;border-radius:99px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.15em;">taken</span>
+      </div>
+      <div class="sc" style="border-color:rgba(212,67,42,.42);background:rgba(212,67,42,.1);">
+        <div style="width:10px;height:10px;border-radius:50%;background:var(--verm);box-shadow:0 0 12px var(--verm);" class="pulse"></div>
+        <div><div style="font-size:17px;font-weight:500;">Amlodipine 5mg</div><div class="mono" style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.15em;">evening · Papa</div></div>
+        <span class="mono" style="font-size:14px;color:var(--tx2);">18:30</span>
+        <span style="background:rgba(212,67,42,.22);color:var(--verm);font-size:11px;padding:5px 14px;border-radius:99px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.15em;">overdue</span>
+      </div>
+      <div class="sc" style="border-color:rgba(14,159,139,.28);background:rgba(14,159,139,.08);">
+        <div style="width:10px;height:10px;border-radius:50%;background:var(--teal);"></div>
+        <div><div style="font-size:17px;font-weight:500;">Salbutamol Inhaler</div><div class="mono" style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.15em;">as needed · Aanya</div></div>
+        <span></span>
+        <span style="background:rgba(14,159,139,.2);color:var(--teal);font-size:11px;padding:5px 14px;border-radius:99px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.15em;">packed ✓</span>
+      </div>
+      <div class="sc" style="border-color:rgba(201,165,59,.14);background:transparent;">
+        <div style="width:10px;height:10px;border-radius:50%;border:2px solid var(--tx3);"></div>
+        <div><div style="font-size:17px;font-weight:500;color:var(--tx2);">Pantoprazole 40mg</div><div class="mono" style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.15em;">night · Dadi</div></div>
+        <span class="mono" style="font-size:14px;color:var(--tx2);">21:00</span>
+        <span style="background:rgba(14,159,139,.14);color:var(--teal);font-size:11px;padding:5px 14px;border-radius:99px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.15em;">pending</span>
+      </div>
+      <div class="sc" style="border-color:rgba(201,165,59,.14);background:transparent;">
+        <div style="width:10px;height:10px;border-radius:50%;border:2px solid var(--tx3);"></div>
+        <div><div style="font-size:17px;font-weight:500;color:var(--tx2);">Atorvastatin 10mg</div><div class="mono" style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.15em;">night · Dadi</div></div>
+        <span class="mono" style="font-size:14px;color:var(--tx2);">21:30</span>
+        <span style="background:rgba(14,159,139,.14);color:var(--teal);font-size:11px;padding:5px 14px;border-radius:99px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.15em;">pending</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S10 · PRIVACY — ON DEVICE
+══════════════════════════════════════ -->
+<div class="slide">
+  <div class="eye" style="margin-bottom:20px;">✦ &nbsp;Privacy · by architecture</div>
+  <div class="two-c" style="gap:80px;">
+    <div>
+      <div class="h-lg" style="margin-bottom:24px;">Soft interface.<br/>Hard clinical<br/>guardrails.</div>
+      <p class="body-lg" style="max-width:460px;margin-bottom:32px;">The server never persists health content. The decrypted blob exists in RAM for the duration of one HTTP request, then is purged. DPDP · HIPAA · GDPR compliant by architecture, not by policy promise.</p>
+      <div class="fc" style="margin-bottom:16px;">
+        <div class="eye" style="color:var(--gold);margin-bottom:12px;">🔐 &nbsp;On-device private memory</div>
+        <p class="body-md">Each user has a single encrypted <span class="mono" style="color:var(--gold);font-size:14px;">.kutumb</span> file. AES-256-GCM. Key wrapped by biometric via Android Keystore / iOS Secure Enclave. Never uploaded.</p>
+      </div>
+      <div class="fc">
+        <div class="eye" style="color:var(--verm);margin-bottom:12px;">⚡ &nbsp;Rules before generation</div>
+        <p class="body-md">Emergency wording, unsafe vitals, medicine conflicts — all checked deterministically before Claude even sees the message.</p>
+      </div>
+    </div>
+    <div>
+      <div class="eye" style="color:var(--tx3);margin-bottom:18px;">Memory flow — one session</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:center;gap:14px;padding:20px 24px;background:var(--surf);border-radius:16px;border:1px solid var(--bdr);">
+          <span style="font-size:28px;">📱</span>
+          <div><div style="font-size:17px;font-weight:600;">User speaks</div><div class="body-sm">Any Indic language via Bhashini or Whisper</div></div>
+        </div>
+        <div style="text-align:center;font-size:24px;color:var(--tx3);">↓</div>
+        <div style="display:flex;align-items:center;gap:14px;padding:20px 24px;background:var(--surf);border-radius:16px;border:1px solid rgba(201,165,59,.3);">
+          <span style="font-size:28px;">🔓</span>
+          <div><div style="font-size:17px;font-weight:600;color:var(--gold);">Decrypt .kutumb</div><div class="body-sm">Biometric unlock · stays in RAM only</div></div>
+        </div>
+        <div style="text-align:center;font-size:24px;color:var(--tx3);">↓</div>
+        <div style="display:flex;align-items:center;gap:14px;padding:20px 24px;background:var(--surf);border-radius:16px;border:1px solid rgba(14,159,139,.3);">
+          <span style="font-size:28px;">🤖</span>
+          <div><div style="font-size:17px;font-weight:600;color:var(--teal);">Claude session</div><div class="body-sm">Health memory sent in system prompt · 3 outputs: reply · patches · triggers</div></div>
+        </div>
+        <div style="text-align:center;font-size:24px;color:var(--tx3);">↓</div>
+        <div style="display:flex;align-items:center;gap:14px;padding:20px 24px;background:var(--surf);border-radius:16px;border:1px solid rgba(212,67,42,.3);">
+          <span style="font-size:28px;">🔒</span>
+          <div><div style="font-size:17px;font-weight:600;color:var(--verm);">Re-encrypt locally</div><div class="body-sm">Patches applied · saved to device only · never cloud</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S11 · FAMILY SHARING
+══════════════════════════════════════ -->
+<div class="slide">
+  <div class="eye" style="margin-bottom:20px;">✦ &nbsp;Family sharing · कुटुंब</div>
+  <div class="two-c" style="gap:80px;">
+    <div>
+      <div class="h-lg" style="margin-bottom:24px;">One health<br/>record.<br/>The whole household.</div>
+      <p class="body-lg" style="max-width:440px;margin-bottom:32px;">A child in London sees Dadi's BP trend in Jaipur and Aanya's inhaler status in Mumbai — from one dashboard, without mixing private notes.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <span style="padding:10px 18px;border-radius:99px;background:var(--vs);border:1px solid rgba(212,67,42,.28);font-size:15px;color:var(--verm);">👴 Dada · elder</span>
+        <span style="padding:10px 18px;border-radius:99px;background:var(--vs);border:1px solid rgba(212,67,42,.28);font-size:15px;color:var(--verm);">👵 Dadi · elder</span>
+        <span style="padding:10px 18px;border-radius:99px;background:var(--gs);border:1px solid rgba(201,165,59,.28);font-size:15px;color:var(--gold);">👨 Papa · parent</span>
+        <span style="padding:10px 18px;border-radius:99px;background:var(--gs);border:1px solid rgba(201,165,59,.28);font-size:15px;color:var(--gold);">👩 Mummy · parent</span>
+        <span style="padding:10px 18px;border-radius:99px;background:var(--ts);border:1px solid rgba(14,159,139,.28);font-size:15px;color:var(--teal);">🧑 You · child</span>
+      </div>
+    </div>
+    <div>
+      <div class="eye" style="color:var(--tx3);margin-bottom:18px;">Permission levels</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:center;gap:16px;padding:18px 22px;background:var(--surf);border-radius:16px;border:1px solid var(--bdr);">
+          <span style="width:10px;height:10px;border-radius:50%;background:var(--gold);flex-shrink:0;"></span>
+          <span style="font-size:16px;font-weight:600;width:160px;color:var(--gold);">full_access</span>
+          <span class="body-sm">View + manage all records, medicines, check-ins, reports</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;padding:18px 22px;background:var(--surf);border-radius:16px;border:1px solid var(--bdr);">
+          <span style="width:10px;height:10px;border-radius:50%;background:var(--teal);flex-shrink:0;"></span>
+          <span style="font-size:16px;font-weight:600;width:160px;color:var(--teal);">manage_medicines</span>
+          <span class="body-sm">Add / edit schedules, log doses</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;padding:18px 22px;background:var(--surf);border-radius:16px;border:1px solid var(--bdr);">
+          <span style="width:10px;height:10px;border-radius:50%;background:var(--sky);flex-shrink:0;"></span>
+          <span style="font-size:16px;font-weight:600;width:160px;color:var(--sky);">view_checkins</span>
+          <span class="body-sm">Read-only: check-ins and health scores</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;padding:18px 22px;background:var(--surf);border-radius:16px;border:1px solid var(--bdr);">
+          <span style="width:10px;height:10px;border-radius:50%;background:var(--verm);flex-shrink:0;"></span>
+          <span style="font-size:16px;font-weight:600;width:160px;color:var(--verm);">receive_sos</span>
+          <span class="body-sm">Emergency alerts and SOS packet only</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S12 · SOS HANDOFF
+══════════════════════════════════════ -->
+<div class="slide">
+  <div class="eye" style="margin-bottom:20px;">✦ &nbsp;SOS doctor handoff</div>
+  <div class="two-c" style="gap:80px;">
+    <div>
+      <div class="h-lg" style="margin-bottom:24px;">One tap.<br/>Doctor-ready<br/>in seconds.</div>
+      <p class="body-lg" style="max-width:440px;margin-bottom:28px;">When something is wrong, the last thing a family should do is hunt for paper prescriptions and old reports. Kutumb has it all ready.</p>
+      <p class="body-md" style="color:var(--tx3);max-width:420px;">Twilio SMS + push notification to every linked family member with <span style="color:var(--tx2);">receive_sos</span> permission.</p>
+    </div>
+    <div>
+      <div style="background:linear-gradient(135deg,rgba(212,67,42,.2),rgba(212,67,42,.07));border:1px solid rgba(212,67,42,.45);border-radius:22px;padding:32px 36px;box-shadow:0 0 60px rgba(212,67,42,.1);">
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+          <div style="width:48px;height:48px;border-radius:50%;background:rgba(212,67,42,.3);display:flex;align-items:center;justify-content:center;font-size:22px;">🚨</div>
+          <div>
+            <div class="eye" style="color:var(--verm);">SOS packet ready</div>
+            <div style="font-size:16px;color:var(--tx2);margin-top:4px;">Papa · 7-day clinical context</div>
+          </div>
+          <div style="margin-left:auto;background:rgba(212,67,42,.2);color:var(--verm);font-size:11px;padding:6px 14px;border-radius:99px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.15em;">PDF ready</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;font-size:16px;color:var(--tx2);">
+          <div>✅ &nbsp;Current medicines (7) with adherence percentages</div>
+          <div>✅ &nbsp;Vitals log: BP, HR, SpO₂ — last 7 days</div>
+          <div>✅ &nbsp;Latest lab reports + flagged abnormal values</div>
+          <div>✅ &nbsp;Known allergies and contraindications</div>
+          <div>✅ &nbsp;Symptom timeline with severity scores</div>
+          <div>✅ &nbsp;Organ scores + trend direction</div>
+          <div>✅ &nbsp;Active medicines + prescriptions (OCR verified)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S13 · TECH STACK — FRONTEND / BACKEND
+══════════════════════════════════════ -->
+<div class="slide">
+  <div class="eye" style="margin-bottom:20px;">✦ &nbsp;Architecture · frontend &amp; backend</div>
+  <div class="h-lg" style="margin-bottom:36px;">Production-grade.<br/>Hackathon-born.</div>
+  <div class="two-c" style="gap:80px;align-items:start;">
+    <div>
+      <div class="eye" style="color:var(--gold);margin-bottom:18px;">Frontend</div>
+      <div class="tpill" style="margin-bottom:12px;"><span style="font-size:28px;">📱</span><div><div style="font-size:18px;font-weight:600;">React Native + Expo SDK 55</div><div class="body-sm">Mobile app · TypeScript · 19 screens</div></div></div>
+      <div class="tpill"><span style="font-size:28px;">🌐</span><div><div style="font-size:18px;font-weight:600;">Next.js 15 + Tailwind CSS</div><div class="body-sm">Web dashboard · TypeScript · 9 routes</div></div></div>
+    </div>
+    <div>
+      <div class="eye" style="color:var(--teal);margin-bottom:18px;">Backend</div>
+      <div class="tpill" style="margin-bottom:12px;"><span style="font-size:28px;">🐍</span><div><div style="font-size:18px;font-weight:600;">FastAPI 1.0 · Python</div><div class="body-sm">52 files · 9,568 lines · 14 routers · async Firestore</div></div></div>
+      <div class="tpill" style="margin-bottom:12px;"><span style="font-size:28px;">🔥</span><div><div style="font-size:18px;font-weight:600;">Firebase Firestore + Auth + Storage</div><div class="body-sm">Async client · ID token auth · TTLCache 300s</div></div></div>
+      <div class="tpill"><span style="font-size:28px;">🐳</span><div><div style="font-size:18px;font-weight:600;">Docker + Vercel</div><div class="body-sm">Dockerfile included · Vercel deployment config ready</div></div></div>
+    </div>
+  </div>
+  <div style="margin-top:32px;padding:22px 28px;background:var(--surf);border:1px solid var(--bdr);border-radius:18px;">
+    <div class="eye" style="color:var(--tx3);margin-bottom:14px;">API endpoints · /api/v1/</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;">
+      <span class="pill pg">auth</span><span class="pill pg">users</span><span class="pill pg">family</span>
+      <span class="pill pt">checkins</span><span class="pill pr">medicines</span><span class="pill pg">health</span>
+      <span class="pill pt">lab_reports</span><span class="pill pg">insights</span><span class="pill pt">ai/session</span>
+      <span class="pill pr">emergency</span><span class="pill pg">referrals</span><span class="pill pt">wearable</span>
+      <span class="pill pg">ai/session/onboard</span><span class="pill pt">ai/memory</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S14 · TECH STACK — AI & NUMBERS
+══════════════════════════════════════ -->
+<div class="slide">
+  <div class="eye" style="margin-bottom:20px;">✦ &nbsp;Architecture · AI &amp; voice</div>
+  <div class="two-c" style="gap:80px;align-items:start;">
+    <div>
+      <div class="eye" style="color:var(--verm);margin-bottom:18px;">AI &amp; Voice</div>
+      <div class="tpill" style="border-color:rgba(212,67,42,.22);margin-bottom:12px;"><span style="font-size:28px;">🤖</span><div><div style="font-size:18px;font-weight:600;">Claude claude-sonnet-4-6</div><div class="body-sm">Primary AI · Anthropic SDK · health memory in system prompt</div></div></div>
+      <div class="tpill" style="margin-bottom:12px;"><span style="font-size:28px;">🎙</span><div><div style="font-size:18px;font-weight:600;">Bhashini ASR + Whisper large-v3</div><div class="body-sm">Primary + fallback STT · 11 languages · on-device offline</div></div></div>
+      <div class="tpill" style="margin-bottom:12px;"><span style="font-size:28px;">👁</span><div><div style="font-size:18px;font-weight:600;">Google Cloud Vision API</div><div class="body-sm">Prescription OCR + lab report extraction</div></div></div>
+      <div class="tpill" style="margin-bottom:12px;"><span style="font-size:28px;">📄</span><div><div style="font-size:18px;font-weight:600;">WeasyPrint + Jinja2</div><div class="body-sm">Doctor referral PDF generation</div></div></div>
+      <div class="tpill"><span style="font-size:28px;">📲</span><div><div style="font-size:18px;font-weight:600;">Twilio SMS</div><div class="body-sm">SOS alerts · emergency escalation to family</div></div></div>
+    </div>
+    <div>
+      <div class="eye" style="color:var(--sky);margin-bottom:18px;">By the numbers</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
+        <div style="text-align:center;padding:24px;background:var(--surf);border:1px solid var(--bdr);border-radius:18px;">
+          <div class="disp" style="font-size:72px;color:var(--gold);line-height:1;">52</div>
+          <div style="font-size:13px;color:var(--tx3);text-transform:uppercase;letter-spacing:.18em;margin-top:8px;">Python files</div>
+        </div>
+        <div style="text-align:center;padding:24px;background:var(--surf);border:1px solid var(--bdr);border-radius:18px;">
+          <div class="disp" style="font-size:72px;color:var(--teal);line-height:1;">14</div>
+          <div style="font-size:13px;color:var(--tx3);text-transform:uppercase;letter-spacing:.18em;margin-top:8px;">API routers</div>
+        </div>
+        <div style="text-align:center;padding:24px;background:var(--surf);border:1px solid var(--bdr);border-radius:18px;">
+          <div class="disp" style="font-size:72px;color:var(--verm);line-height:1;">9.5K</div>
+          <div style="font-size:13px;color:var(--tx3);text-transform:uppercase;letter-spacing:.18em;margin-top:8px;">Lines of code</div>
+        </div>
+        <div style="text-align:center;padding:24px;background:var(--surf);border:1px solid var(--bdr);border-radius:18px;">
+          <div class="disp" style="font-size:72px;color:var(--gold);line-height:1;">19</div>
+          <div style="font-size:13px;color:var(--tx3);text-transform:uppercase;letter-spacing:.18em;margin-top:8px;">Mobile screens</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S15 · PRODUCT SCREENSHOT
+══════════════════════════════════════ -->
+<div class="slide">
+  <div class="eye" style="margin-bottom:20px;">✦ &nbsp;The product · live</div>
+  <div class="two-c" style="gap:80px;">
+    <div>
+      <div class="h-lg" style="margin-bottom:24px;">Family health.<br/>In your pocket.</div>
+      <p class="body-lg" style="max-width:440px;margin-bottom:36px;">A native Android + iOS app, paired with a full-featured web dashboard. One Firebase Auth token spans both surfaces. Encrypted local memory works offline.</p>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div style="display:flex;align-items:center;gap:18px;padding:20px 24px;background:var(--surf);border-radius:16px;border:1px solid var(--bdr);">
+          <div style="width:44px;height:44px;border-radius:13px;background:var(--ts);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">📱</div>
+          <div><div style="font-size:17px;font-weight:600;">Android APK · available now</div><div class="body-sm">kutumb-android-release.apk — built &amp; signed</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:18px;padding:20px 24px;background:var(--surf);border-radius:16px;border:1px solid var(--bdr);">
+          <div style="width:44px;height:44px;border-radius:13px;background:var(--gs);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">🌐</div>
+          <div><div style="font-size:17px;font-weight:600;">Web app · Next.js 15</div><div class="body-sm">Dashboard · AI chat · Full family board</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:18px;padding:20px 24px;background:var(--surf);border-radius:16px;border:1px solid var(--bdr);">
+          <div style="width:44px;height:44px;border-radius:13px;background:var(--ss);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">🔌</div>
+          <div><div style="font-size:17px;font-weight:600;">FastAPI backend · Docker</div><div class="body-sm">Dockerfile + Vercel deployment config included</div></div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:20px;">
+      <div class="phone bob">
+        <img src="kutumb_openrouter.png" alt="Kutumb mobile app login screen"/>
+      </div>
+      <div style="text-align:center;">
+        <div class="eye" style="color:var(--tx3);">Mobile · Login screen</div>
+        <div class="body-sm" style="margin-top:6px;">React Native · Firebase Auth</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S16 · MARKET (PHOTO SLIDE)
+══════════════════════════════════════ -->
+<div class="slide" style="padding:0!important;">
+  <div style="position:absolute;inset:0;z-index:0;">
+    <img src="web/public/images/kutumb-family-care.png" alt="Indian family using Kutumb" style="width:100%;height:100%;object-fit:cover;object-position:center;"/>
+    <div style="position:absolute;inset:0;background:linear-gradient(105deg,rgba(8,8,13,.97) 0%,rgba(8,8,13,.85) 48%,rgba(8,8,13,.18) 100%);"></div>
+  </div>
+  <div style="position:relative;z-index:1;padding:80px 120px;max-width:760px;">
+    <div class="eye" style="margin-bottom:20px;">✦ &nbsp;The market · opportunity</div>
+    <div class="h-xl" style="margin-bottom:22px;">Away from home.<br/>Close to the heart.</div>
+    <p class="body-lg" style="max-width:520px;margin-bottom:44px;">Every Indian abroad — and every Indian whose parents live in a different city — runs the same broken loop. Kutumb is the layer they're missing.</p>
+    <div style="display:flex;flex-direction:column;gap:0;">
+      <div style="display:flex;align-items:center;gap:24px;padding:22px 0;">
+        <div class="disp" style="font-size:76px;color:var(--gold);line-height:1;min-width:130px;">18M</div>
+        <div class="body-lg">Indians living abroad with aging parents at home — the diaspora caregiver segment</div>
+      </div>
+      <div class="rule"></div>
+      <div style="display:flex;align-items:center;gap:24px;padding:22px 0;">
+        <div class="disp" style="font-size:76px;color:var(--verm);line-height:1;min-width:130px;">$300B</div>
+        <div class="body-lg">Annual global cost of medicine non-adherence + 125,000 preventable deaths/year</div>
+      </div>
+      <div class="rule"></div>
+      <div style="display:flex;align-items:center;gap:24px;padding:22px 0;">
+        <div class="disp" style="font-size:76px;color:var(--teal);line-height:1;min-width:130px;">800M</div>
+        <div class="body-lg">Indians with smartphones by 2025, with zero family health management apps built for their reality</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S17 · ROADMAP PAGE 1
+══════════════════════════════════════ -->
+<div class="slide">
+  <div class="eye" style="margin-bottom:20px;">✦ &nbsp;What's next · roadmap</div>
+  <div class="h-lg" style="margin-bottom:32px;">16 features.<br/>One architecture.</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;">
+    <div class="fc"><div style="font-size:28px;margin-bottom:14px;">🎤</div><div style="font-size:17px;font-weight:600;margin-bottom:10px;">Voice Biomarkers</div><p class="body-sm">Parkinson tremor, COPD, depression markers from 30s of voice. >85% sensitivity using the user's own baseline.</p></div>
+    <div class="fc"><div style="font-size:28px;margin-bottom:14px;">💊</div><div style="font-size:17px;font-weight:600;margin-bottom:10px;">Pill Identifier</div><p class="body-sm">Camera → identify unknown pill → instant contraindication check against current medicines.</p></div>
+    <div class="fc"><div style="font-size:28px;margin-bottom:14px;">🧬</div><div style="font-size:17px;font-weight:600;margin-bottom:10px;">Hereditary Risk Tree</div><p class="body-sm">Collaborative family medical tree. Auto-adjust alert thresholds based on genetic history.</p></div>
+    <div class="fc"><div style="font-size:28px;margin-bottom:14px;">🤱</div><div style="font-size:17px;font-weight:600;margin-bottom:10px;">Maternal &amp; Pediatric</div><p class="body-sm">WHO growth charts, National Immunization Schedule sync, danger signs in local language.</p></div>
+    <div class="fc"><div style="font-size:28px;margin-bottom:14px;">🧠</div><div style="font-size:17px;font-weight:600;margin-bottom:10px;">Mental Health Mode</div><p class="body-sm">Voice-based PHQ-9 / GAD-7 as natural conversation. Crisis detection + escalation to iCall / 988.</p></div>
+    <div class="fc"><div style="font-size:28px;margin-bottom:14px;">💉</div><div style="font-size:17px;font-weight:600;margin-bottom:10px;">Vaccine Tracker</div><p class="body-sm">Adult + childhood schedule. Cancer screening reminders by age and gender. Wildly under-utilised.</p></div>
+    <div class="fc"><div style="font-size:28px;margin-bottom:14px;">💆</div><div style="font-size:17px;font-weight:600;margin-bottom:10px;">Caregiver Burnout</div><p class="body-sm">Track the diaspora child's stress too. Surface a prompt after 4 weeks of declining sleep + rising care hours.</p></div>
+    <div class="fc"><div style="font-size:28px;margin-bottom:14px;">🏥</div><div style="font-size:17px;font-weight:600;margin-bottom:10px;">Scheme Matcher</div><p class="body-sm">Auto-match to Ayushman Bharat / PMJAY eligibility. Generate claims documentation automatically.</p></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S18 · ROADMAP PAGE 2
+══════════════════════════════════════ -->
+<div class="slide">
+  <div class="eye" style="margin-bottom:20px;">✦ &nbsp;Roadmap · continued</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:8px;">
+    <div class="fc"><div style="font-size:28px;margin-bottom:14px;">⏰</div><div style="font-size:17px;font-weight:600;margin-bottom:10px;">Smart Reminders</div><p class="body-sm">Learn when user actually takes medicine. Pair with habit anchor: "When you finish your chai, take your BP pill." +30–45% adherence.</p></div>
+    <div class="fc"><div style="font-size:28px;margin-bottom:14px;">📉</div><div style="font-size:17px;font-weight:600;margin-bottom:10px;">Fall Detection</div><p class="body-sm">Accelerometer + gyroscope → 30s grace → if no "I'm okay" voice response → SOS to family + ambulance.</p></div>
+    <div class="fc"><div style="font-size:28px;margin-bottom:14px;">🏪</div><div style="font-size:17px;font-weight:600;margin-bottom:10px;">Pharmacy Network</div><p class="body-sm">PharmEasy / 1mg routing. Aggregated price comparison. Lab orders to Thyrocare / Dr. Lal PathLabs.</p></div>
+    <div class="fc"><div style="font-size:28px;margin-bottom:14px;">🍱</div><div style="font-size:17px;font-weight:600;margin-bottom:10px;">Diet Coach</div><p class="body-sm">Region-specific, condition-aware. "Can I eat idli for breakfast?" Photo thali logging with carb + sodium estimate.</p></div>
+    <div class="fc"><div style="font-size:28px;margin-bottom:14px;">⌚</div><div style="font-size:17px;font-weight:600;margin-bottom:10px;">Deeper Wearables</div><p class="body-sm">Mi Band, boAt, Noise + Omron BP cuffs + Accu-Chek glucometers via Bluetooth. Dominant in India.</p></div>
+    <div class="fc"><div style="font-size:28px;margin-bottom:14px;">💬</div><div style="font-size:17px;font-weight:600;margin-bottom:10px;">Family Health Chat</div><p class="body-sm">Group chat inside app. Claude Sunday digest: "Papa missed 2 Metformin this week. Mummy's sleep declining."</p></div>
+    <div class="fc"><div style="font-size:28px;margin-bottom:14px;">🤝</div><div style="font-size:17px;font-weight:600;margin-bottom:10px;">Bereavement Mode</div><p class="body-sm">Immediately stop traumatising reminders after pregnancy loss or death. One conversation → respectful pause.</p></div>
+    <div class="fc"><div style="font-size:28px;margin-bottom:14px;">✈️</div><div style="font-size:17px;font-weight:600;margin-bottom:10px;">Travel Health Mode</div><p class="body-sm">Geo-aware hospital routing. Auto-translate Doctor PDF into local language. Vaccination adjustments.</p></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     S19 · CLOSING
+══════════════════════════════════════ -->
+<div class="slide" style="align-items:center;text-align:center;justify-content:center;">
+  <svg style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);opacity:.055;pointer-events:none;" width="720" height="720" viewBox="0 0 720 720" fill="none">
+    <g transform="translate(360,360)">
+      <circle r="320" fill="none" stroke="#C9A53B" stroke-width="1" stroke-dasharray="5 10"/>
+      <circle r="240" fill="none" stroke="#C9A53B" stroke-width="1" stroke-dasharray="3 7"/>
+      <circle r="160" fill="none" stroke="#D4432A" stroke-width="1" stroke-dasharray="4 6"/>
+      <circle r="80"  fill="none" stroke="#C9A53B" stroke-width="1.5"/>
+      <line x1="-320" y1="0" x2="320" y2="0" stroke="#C9A53B" stroke-width=".5" opacity=".5"/>
+      <line x1="0" y1="-320" x2="0" y2="320" stroke="#C9A53B" stroke-width=".5" opacity=".5"/>
+      <line x1="-226" y1="-226" x2="226" y2="226" stroke="#C9A53B" stroke-width=".4" opacity=".35"/>
+      <line x1="226" y1="-226" x2="-226" y2="226" stroke="#C9A53B" stroke-width=".4" opacity=".35"/>
+    </g>
+  </svg>
+  <div style="position:relative;z-index:1;">
+    <div style="width:88px;height:88px;border-radius:50%;background:linear-gradient(145deg,#2A5C3F,#153324);display:flex;align-items:center;justify-content:center;margin:0 auto 28px;box-shadow:0 0 0 1px rgba(201,165,59,.32),0 0 64px rgba(201,165,59,.16);">
+      <svg width="44" height="44" viewBox="0 0 44 44" fill="none"><path d="M22 8c-4.5 0-10 3.5-10 9 0 4.5 2.5 7 6 10l4 4.5 4-4.5c3.5-3 6-5.5 6-10 0-5.5-5.5-9-10-9z" fill="#4ADE80"/><path d="M14 23c-3.5 2-8 6-8 10.5s3.5 9 8 10" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round"/><path d="M30 23c3.5 2 8 6 8 10.5s-3.5 9-8 10" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round"/><path d="M22 43v-8" stroke="#4ADE80" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </div>
+    <div class="eye" style="margin-bottom:20px;">✦ &nbsp;कुटुंब · KUTUMB</div>
+    <div class="disp" style="font-size:92px;font-weight:500;line-height:.95;letter-spacing:-.02em;margin-bottom:24px;">
+      Start with one profile.<br/><span style="color:var(--gold);">Let the care record grow.</span>
+    </div>
+    <p style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:22px;color:var(--tx2);line-height:1.7;max-width:640px;margin:0 auto 44px;">
+      We're not building a doctor replacement. We're building the memory and the messenger between three people who currently don't talk to each other in any structured way.
+    </p>
+    <div style="display:flex;justify-content:center;gap:16px;margin-bottom:52px;">
+      <div style="padding:16px 36px;background:var(--gold);color:#08080D;border-radius:99px;font-weight:700;font-size:16px;cursor:pointer;">Request a demo →</div>
+      <div style="padding:16px 36px;background:var(--surf);color:var(--tx1);border:1px solid var(--bdr);border-radius:99px;font-weight:600;font-size:16px;cursor:pointer;">View on GitHub</div>
+    </div>
+    <div style="display:flex;justify-content:center;align-items:center;">
+      <div style="padding:0 44px;text-align:center;border-right:1px solid var(--bdr);">
+        <div class="disp" style="font-size:60px;font-weight:500;color:var(--gold);line-height:1;">18M</div>
+        <div style="font-size:12px;color:var(--tx3);text-transform:uppercase;letter-spacing:.18em;margin-top:6px;">Diaspora caregivers</div>
+      </div>
+      <div style="padding:0 44px;text-align:center;border-right:1px solid var(--bdr);">
+        <div class="disp" style="font-size:60px;font-weight:500;color:var(--verm);line-height:1;">$300B</div>
+        <div style="font-size:12px;color:var(--tx3);text-transform:uppercase;letter-spacing:.18em;margin-top:6px;">Adherence cost / yr</div>
+      </div>
+      <div style="padding:0 44px;text-align:center;border-right:1px solid var(--bdr);">
+        <div class="disp" style="font-size:60px;font-weight:500;color:var(--teal);line-height:1;">6+</div>
+        <div style="font-size:12px;color:var(--tx3);text-transform:uppercase;letter-spacing:.18em;margin-top:6px;">Indic languages</div>
+      </div>
+      <div style="padding:0 44px;text-align:center;">
+        <div class="disp" style="font-size:60px;font-weight:500;color:var(--gold);line-height:1;">4</div>
+        <div style="font-size:12px;color:var(--tx3);text-transform:uppercase;letter-spacing:.18em;margin-top:6px;">Organ scores</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- .deck -->
+
+<div id="nav"></div>
+<button class="arr" id="ap" onclick="go(-1)" aria-label="Prev">
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M11 4L7 9l4 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+</button>
+<button class="arr" id="an" onclick="go(1)" aria-label="Next">
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M7 4l4 5-4 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+</button>
+
+<script>
+const cursor=document.getElementById('cur');
+document.addEventListener('mousemove',e=>{cursor.style.left=e.clientX+'px';cursor.style.top=e.clientY+'px';});
+
+const slides=[...document.querySelectorAll('.slide')];
+let cur=0;
+const nav=document.getElementById('nav');
+slides.forEach((_,i)=>{
+  const d=document.createElement('div');d.className='nd'+(i===0?' on':'');
+  d.onclick=()=>goTo(i);nav.appendChild(d);
+});
+const ctr=document.createElement('div');ctr.id='ctr';nav.appendChild(ctr);
+
+function upd(){
+  document.querySelectorAll('.nd').forEach((d,i)=>d.classList.toggle('on',i===cur));
+  ctr.textContent=String(cur+1).padStart(2,'0')+' / '+String(slides.length).padStart(2,'0');
+}
+function goTo(i){
+  if(i===cur||i<0||i>=slides.length)return;
+  slides[cur].classList.add('exit');slides[cur].classList.remove('active');
+  const old=cur;setTimeout(()=>slides[old].classList.remove('exit'),340);
+  cur=i;slides[cur].classList.add('active');upd();
+}
+function go(d){goTo(cur+d);}
+document.addEventListener('keydown',e=>{
+  if(['ArrowRight','ArrowDown',' '].includes(e.key)){e.preventDefault();go(1);}
+  if(['ArrowLeft','ArrowUp'].includes(e.key)){e.preventDefault();go(-1);}
+  if(e.key==='Home')goTo(0);if(e.key==='End')goTo(slides.length-1);
+});
+let tx=0;
+document.addEventListener('touchstart',e=>tx=e.touches[0].clientX);
+document.addEventListener('touchend',e=>{const d=tx-e.changedTouches[0].clientX;if(Math.abs(d)>50)go(d>0?1:-1);});
+upd();
+</script>
+</body>
+</html>

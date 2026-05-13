@@ -86,15 +86,15 @@ async def _adherence_pct(
     if doses_per_day <= 0:
         return 100.0
     logs_ref = db.collection("users").document(uid).collection("medicine_logs")
-    query = (
-        logs_ref
-        .where("medicine_id", "==", medicine_id)
-        .where("action", "==", "taken")
-        .where("log_date", ">=", start_date.isoformat())
-        .where("log_date", "<=", end_date.isoformat())
-    )
-    taken_docs = [d async for d in query.stream()]
-    taken_count = len(taken_docs)
+    query = logs_ref.where("medicine_id", "==", medicine_id)
+    start_str = start_date.isoformat()
+    end_str = end_date.isoformat()
+    taken_count = 0
+    async for doc in query.stream():
+        data = doc.to_dict() or {}
+        log_date = data.get("log_date", "")
+        if data.get("action") == "taken" and start_str <= log_date <= end_str:
+            taken_count += 1
     days = max((end_date - start_date).days + 1, 1)
     expected = doses_per_day * days
     if expected <= 0:
