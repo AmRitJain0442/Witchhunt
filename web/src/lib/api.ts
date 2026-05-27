@@ -178,6 +178,12 @@ function normalizeMember(raw: Record<string, unknown>) {
 function normalizeHealthScores(raw: Record<string, unknown>) {
   const emptyOrgan = { score: 0, trend: 'stable', factors: [] as string[], recommendations: [] as string[] };
   const organMap: Record<string, typeof emptyOrgan> = {};
+  const computedAt =
+    typeof raw.computed_at === 'string'
+      ? raw.computed_at
+      : typeof raw.score_date === 'string'
+        ? raw.score_date
+        : new Date().toISOString();
 
   if (Array.isArray(raw.organs)) {
     for (const item of raw.organs) {
@@ -200,7 +206,7 @@ function normalizeHealthScores(raw: Record<string, unknown>) {
   return {
     ...raw,
     overall: Number(raw.overall ?? raw.overall_score ?? 0),
-    computed_at: raw.computed_at ?? raw.score_date ?? new Date().toISOString(),
+    computed_at: computedAt,
     heart: organMap.heart ?? emptyOrgan,
     brain: organMap.brain ?? emptyOrgan,
     gut: organMap.gut ?? emptyOrgan,
